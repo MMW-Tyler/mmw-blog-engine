@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MMW Blog Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Barlow:wght@400;500;600&family=Lato:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green: #28AB83;
+      --dark: #323547;
+      --white: #FFFFFF;
+      --light-green: #E5F5F0;
+      --off-white: #F7FAF9;
+      --border: #E0E5E3;
+      --muted: #6B7280;
+      --danger: #EF4444;
+      --warning: #F59E0B;
+      --font-head: 'Poppins', sans-serif;
+      --font-ui: 'Barlow', sans-serif;
+      --font-body: 'Lato', sans-serif;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--off-white);
+      color: var(--dark);
+      min-height: 100vh;
+    }
+
+    /* ── LAYOUT ── */
+    .app { display: flex; height: 100vh; overflow: hidden; }
+
+    .sidebar {
+      width: 260px;
+      min-width: 260px;
+      background: var(--dark);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .sidebar-logo {
+      padding: 24px 20px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .sidebar-logo .logo-mark {
+      font-family: var(--font-head);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--green);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .sidebar-logo .logo-title {
+      font-family: var(--font-head);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--white);
+      margin-top: 2px;
+    }
+
+    .sidebar-section {
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .sidebar-section-label {
+      font-family: var(--font-ui);
+      font-size: 10px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.35);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 4px 20px 8px;
+    }
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 20px;
+      cursor: pointer;
+      font-family: var(--font-ui);
+      font-size: 14px;
+      color: rgba(255,255,255,0.65);
+      transition: all 0.15s;
+      border-left: 3px solid transparent;
+    }
+    .sidebar-item:hover { background: rgba(255,255,255,0.06); color: var(--white); }
+    .sidebar-item.active {
+      background: rgba(40,171,131,0.15);
+      color: var(--white);
+      border-left-color: var(--green);
+    }
+    .sidebar-item .icon { font-size: 16px; width: 20px; text-align: center; }
+
+    .client-list {
+      padding: 8px 0;
+      flex: 1;
+      overflow-y: auto;
+    }
+    .client-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 20px;
+      cursor: pointer;
+      font-family: var(--font-ui);
+      font-size: 13px;
+      color: rgba(255,255,255,0.55);
+      transition: all 0.15s;
+      border-left: 3px solid transparent;
+    }
+    .client-item:hover { background: rgba(255,255,255,0.05); color: var(--white); }
+    .client-item.active { background: rgba(40,171,131,0.12); color: var(--white); border-left-color: var(--green); }
+    .client-item .client-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .client-badge {
+      font-size: 10px;
+      background: rgba(40,171,131,0.25);
+      color: var(--green);
+      padding: 1px 6px;
+      border-radius: 10px;
+    }
+
+    .sidebar-add-btn {
+      margin: 12px 16px;
+      padding: 9px;
+      background: rgba(40,171,131,0.15);
+      border: 1px solid rgba(40,171,131,0.3);
+      border-radius: 8px;
+      color: var(--green);
+      font-family: var(--font-ui);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+    }
+    .sidebar-add-btn:hover { background: rgba(40,171,131,0.25); }
+
+    /* ── MAIN ── */
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    .topbar {
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .topbar-title {
+      font-family: var(--font-head);
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--dark);
+    }
+    .topbar-sub {
+      font-family: var(--font-ui);
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+    .topbar-actions { display: flex; gap: 10px; align-items: center; }
+
+    .content { flex: 1; overflow-y: auto; padding: 28px 32px; }
+
+    /* ── BUTTONS ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 18px;
+      border-radius: 8px;
+      font-family: var(--font-ui);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+    }
+    .btn-primary { background: var(--green); color: var(--white); }
+    .btn-primary:hover { background: #22977A; }
+    .btn-secondary { background: var(--white); color: var(--dark); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--off-white); }
+    .btn-danger { background: #FEF2F2; color: var(--danger); border: 1px solid #FECACA; }
+    .btn-danger:hover { background: #FEE2E2; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── CARDS / PANELS ── */
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-family: var(--font-head);
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--dark);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* ── FORMS ── */
+    .form-group { margin-bottom: 16px; }
+    .form-label {
+      display: block;
+      font-family: var(--font-ui);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .form-input, .form-select, .form-textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--font-body);
+      font-size: 14px;
+      color: var(--dark);
+      background: var(--white);
+      transition: border-color 0.15s;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none;
+      border-color: var(--green);
+    }
+    .form-textarea { resize: vertical; min-height: 100px; line-height: 1.6; }
+    .form-hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* ── STATS ROW ── */
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+    }
+    .stat-value {
+      font-family: var(--font-head);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--dark);
+    }
+    .stat-label {
+      font-family: var(--font-ui);
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* ── TABLES ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      font-family: var(--font-ui);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      background: var(--off-white);
+    }
+    td {
+      padding: 12px 14px;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #FAFBFA; }
+
+    /* ── BADGES ── */
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: var(--font-ui);
+    }
+    .badge-proposed { background: #EFF6FF; color: #3B82F6; }
+    .badge-approved { background: var(--light-green); color: var(--green); }
+    .badge-rejected { background: #FEF2F2; color: var(--danger); }
+    .badge-in_progress { background: #FFFBEB; color: var(--warning); }
+    .badge-draft { background: var(--off-white); color: var(--muted); }
+    .badge-in-review { background: #EFF6FF; color: #3B82F6; }
+    .badge-published { background: var(--light-green); color: var(--green); }
+
+    /* ── TABS ── */
+    .tabs {
+      display: flex;
+      gap: 2px;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 24px;
+    }
+    .tab {
+      padding: 10px 18px;
+      font-family: var(--font-ui);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.15s;
+    }
+    .tab:hover { color: var(--dark); }
+    .tab.active { color: var(--green); border-bottom-color: var(--green); }
+
+    /* ── MODALS ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal {
+      background: var(--white);
+      border-radius: 14px;
+      width: 100%;
+      max-width: 620px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    .modal-lg { max-width: 900px; }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-title {
+      font-family: var(--font-head);
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 20px;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+    .modal-close:hover { background: var(--off-white); }
+    .modal-body { padding: 24px; }
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* ── BLOG CONTENT PREVIEW ── */
+    .blog-preview {
+      font-family: var(--font-body);
+      font-size: 14px;
+      line-height: 1.75;
+      color: var(--dark);
+    }
+    .blog-preview h1 { font-family: var(--font-head); font-size: 22px; font-weight: 700; margin: 16px 0 10px; }
+    .blog-preview h2 { font-family: var(--font-head); font-size: 17px; font-weight: 600; margin: 20px 0 8px; color: var(--dark); }
+    .blog-preview h3 { font-family: var(--font-head); font-size: 15px; font-weight: 600; margin: 16px 0 6px; }
+    .blog-preview p { margin-bottom: 12px; }
+    .blog-preview ul { margin: 8px 0 12px 20px; }
+    .blog-preview li { margin-bottom: 5px; }
+    .blog-preview .image-marker {
+      background: var(--light-green);
+      border: 1px dashed var(--green);
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 12px;
+      color: var(--green);
+      font-style: italic;
+      margin: 12px 0;
+    }
+
+    /* ── META BOX ── */
+    .meta-box {
+      background: var(--off-white);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 20px;
+    }
+    .meta-box-title {
+      font-family: var(--font-ui);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+    }
+    .meta-field { display: flex; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+    .meta-field-label { font-weight: 700; min-width: 120px; color: var(--muted); }
+    .meta-field-value { color: var(--dark); flex: 1; }
+
+    /* ── LOADING ── */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: var(--white);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+    }
+    .spinner-dark {
+      border-color: rgba(50,53,71,0.2);
+      border-top-color: var(--dark);
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--muted);
+    }
+    .empty-state .icon { font-size: 36px; margin-bottom: 12px; }
+    .empty-state .title {
+      font-family: var(--font-head);
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--dark);
+      margin-bottom: 6px;
+    }
+    .empty-state .desc { font-size: 13px; line-height: 1.5; }
+
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .alert-success { background: var(--light-green); color: #166534; border: 1px solid #86EFAC; }
+    .alert-error { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; }
+    .alert-info { background: #EFF6FF; color: #1E40AF; border: 1px solid #BFDBFE; }
+
+    .rules-list { display: flex; flex-direction: column; gap: 8px; }
+    .rule-item {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      background: var(--off-white);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      gap: 12px;
+    }
+    .rule-text { font-size: 13px; flex: 1; line-height: 1.5; }
+    .rule-date { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+    .title-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      background: var(--white);
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .title-card .title-text { flex: 1; font-size: 14px; font-weight: 500; line-height: 1.4; }
+    .title-card .title-kw { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .title-card .title-rationale {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+      font-style: italic;
+      line-height: 1.4;
+    }
+    .title-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; margin-top: 2px; }
+
+    .no-client {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      flex-direction: column;
+      gap: 12px;
+      color: var(--muted);
+    }
+    .no-client .icon { font-size: 48px; }
+    .no-client p { font-size: 15px; }
+
+    input[type="file"] { 
+      font-family: var(--font-body); 
+      font-size: 13px;
+      padding: 8px;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      width: 100%;
+      cursor: pointer;
+    }
+
+    .generation-progress {
+      background: var(--light-green);
+      border: 1px solid var(--green);
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+    }
+    .generation-progress p { font-size: 14px; color: var(--green); margin-top: 10px; }
+
+    .wp-setup-steps {
+      background: var(--off-white);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .wp-step {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .wp-step-num {
+      width: 22px;
+      height: 22px;
+      background: var(--dark);
+      color: var(--white);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">MMW Tools</div>
+      <div class="logo-title">Blog Engine</div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Navigation</div>
+      <div class="sidebar-item active" data-view="dashboard" onclick="setView('dashboard')">
+        <span class="icon">🏠</span> Dashboard
+      </div>
+      <div class="sidebar-item" data-view="one-off" onclick="setView('one-off')">
+        <span class="icon">✍️</span> One-Off Blog
+      </div>
+    </div>
+
+    <div class="sidebar-section" style="flex:1; display:flex; flex-direction:column; min-height:0;">
+      <div class="sidebar-section-label">Clients</div>
+      <div class="client-list" id="clientList">
+        <div style="padding: 12px 20px; font-size: 12px; color: rgba(255,255,255,0.3);">Loading...</div>
+      </div>
+      <div class="sidebar-add-btn" onclick="openClientModal()">+ New Client</div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div>
+        <div class="topbar-title" id="topbarTitle">Dashboard</div>
+        <div class="topbar-sub" id="topbarSub">MMW Blog Writing Engine</div>
+      </div>
+      <div class="topbar-actions" id="topbarActions"></div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content" id="mainContent">
+      <!-- Views injected here -->
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     MODALS
+══════════════════════════════════════════════════════ -->
+
+<!-- Client Modal -->
+<div class="modal-overlay" id="clientModal" style="display:none;">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="clientModalTitle">New Client</span>
+      <button class="modal-close" onclick="closeModal('clientModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Client Name *</label>
+          <input class="form-input" id="clientName" placeholder="e.g. Bloom Women's Health" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Vertical</label>
+          <select class="form-select" id="clientVertical">
+            <option value="">Select vertical</option>
+            <option value="Med Spa / Aesthetics">Med Spa / Aesthetics</option>
+            <option value="OB/GYN">OB/GYN</option>
+            <option value="Functional Medicine">Functional Medicine</option>
+            <option value="Urogynecology">Urogynecology</option>
+            <option value="Psychiatry">Psychiatry</option>
+            <option value="Gynecology">Gynecology</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">WordPress URL</label>
+        <input class="form-input" id="clientWpUrl" placeholder="https://clientwebsite.com" />
+        <p class="form-hint">Used for pushing blogs to the client's site</p>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">WP Username</label>
+          <input class="form-input" id="clientWpUser" placeholder="WordPress username" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">WP Application Password</label>
+          <input class="form-input" id="clientWpPass" type="password" placeholder="xxxx xxxx xxxx xxxx" />
+        </div>
+      </div>
+      <div class="wp-setup-steps" style="margin-top:4px;">
+        <p style="font-size:12px; font-weight:600; color:var(--muted); margin-bottom:10px;">How to get the WP Application Password:</p>
+        <div class="wp-step"><div class="wp-step-num">1</div><div>Log in to the client's WordPress admin panel</div></div>
+        <div class="wp-step"><div class="wp-step-num">2</div><div>Go to Users → Profile (or Users → All Users → select user)</div></div>
+        <div class="wp-step"><div class="wp-step-num">3</div><div>Scroll to "Application Passwords" → enter name "MMW Blog Engine" → click Add</div></div>
+        <div class="wp-step"><div class="wp-step-num">4</div><div>Copy the generated password and paste it above. It won't be shown again.</div></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('clientModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveClient()" id="saveClientBtn">Save Client</button>
+    </div>
+  </div>
+</div>
+
+<!-- Blog Generation Modal -->
+<div class="modal-overlay" id="generateModal" style="display:none;">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title" id="generateModalTitle">Generate Blog</span>
+      <button class="modal-close" onclick="closeModal('generateModal')">✕</button>
+    </div>
+    <div class="modal-body" id="generateModalBody">
+      <!-- Dynamic content -->
+    </div>
+  </div>
+</div>
+
+<!-- Blog View Modal -->
+<div class="modal-overlay" id="blogViewModal" style="display:none;">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title" id="blogViewTitle">Blog</span>
+      <button class="modal-close" onclick="closeModal('blogViewModal')">✕</button>
+    </div>
+    <div class="modal-body" id="blogViewBody"></div>
+    <div class="modal-footer" id="blogViewFooter"></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════
+const API = '';
+let state = {
+  clients: [],
+  activeClient: null,
+  activeView: 'dashboard',
+  clientTab: 'titles', // titles | blogs | profile | rules
+  editingClientId: null,
+};
+
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
+async function init() {
+  await loadClients();
+  renderView();
+}
+
+// ══════════════════════════════════════════════
+// CLIENTS
+// ══════════════════════════════════════════════
+async function loadClients() {
+  try {
+    const res = await fetch(`${API}/api/clients`);
+    state.clients = await res.json();
+    renderClientList();
+  } catch (e) {
+    console.error('Failed to load clients', e);
+  }
+}
+
+function renderClientList() {
+  const el = document.getElementById('clientList');
+  if (!state.clients.length) {
+    el.innerHTML = `<div style="padding:12px 20px; font-size:12px; color:rgba(255,255,255,0.3);">No clients yet</div>`;
+    return;
+  }
+  el.innerHTML = state.clients.map(c => `
+    <div class="client-item ${state.activeClient?.id === c.id ? 'active' : ''}" onclick="selectClient('${c.id}')">
+      <span class="client-name">${c.name}</span>
+      ${c.vertical ? `<span class="client-badge">${c.vertical.split('/')[0].trim()}</span>` : ''}
+    </div>
+  `).join('');
+}
+
+function selectClient(id) {
+  state.activeClient = state.clients.find(c => c.id === id);
+  state.activeView = 'client';
+  state.clientTab = 'titles';
+  renderClientList();
+  renderView();
+}
+
+function openClientModal(clientId = null) {
+  state.editingClientId = clientId;
+  if (clientId) {
+    const c = state.clients.find(x => x.id === clientId);
+    document.getElementById('clientModalTitle').textContent = 'Edit Client';
+    document.getElementById('clientName').value = c.name || '';
+    document.getElementById('clientVertical').value = c.vertical || '';
+    document.getElementById('clientWpUrl').value = c.wp_url || '';
+    document.getElementById('clientWpUser').value = c.wp_username || '';
+    document.getElementById('clientWpPass').value = '';
+  } else {
+    document.getElementById('clientModalTitle').textContent = 'New Client';
+    document.getElementById('clientName').value = '';
+    document.getElementById('clientVertical').value = '';
+    document.getElementById('clientWpUrl').value = '';
+    document.getElementById('clientWpUser').value = '';
+    document.getElementById('clientWpPass').value = '';
+  }
+  document.getElementById('clientModal').style.display = 'flex';
+}
+
+async function saveClient() {
+  const btn = document.getElementById('saveClientBtn');
+  const payload = {
+    name: document.getElementById('clientName').value.trim(),
+    vertical: document.getElementById('clientVertical').value,
+    wp_url: document.getElementById('clientWpUrl').value.trim(),
+    wp_username: document.getElementById('clientWpUser').value.trim(),
+    wp_app_password: document.getElementById('clientWpPass').value.trim() || undefined,
+  };
+  if (!payload.name) { alert('Client name is required'); return; }
+  btn.disabled = true;
+  try {
+    const url = state.editingClientId ? `${API}/api/clients/${state.editingClientId}` : `${API}/api/clients`;
+    const method = state.editingClientId ? 'PUT' : 'POST';
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const saved = await res.json();
+    closeModal('clientModal');
+    await loadClients();
+    if (!state.editingClientId) selectClient(saved.id);
+  } catch (e) {
+    alert('Failed to save client');
+  }
+  btn.disabled = false;
+}
+
+// ══════════════════════════════════════════════
+// VIEWS
+// ══════════════════════════════════════════════
+function setView(view) {
+  state.activeView = view;
+  state.activeClient = null;
+  document.querySelectorAll('.sidebar-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.view === view);
+  });
+  renderClientList();
+  renderView();
+}
+
+function renderView() {
+  const content = document.getElementById('mainContent');
+  const title = document.getElementById('topbarTitle');
+  const sub = document.getElementById('topbarSub');
+  const actions = document.getElementById('topbarActions');
+
+  if (state.activeView === 'dashboard') {
+    title.textContent = 'Dashboard';
+    sub.textContent = 'MMW Blog Writing Engine';
+    actions.innerHTML = '';
+    renderDashboard();
+  } else if (state.activeView === 'one-off') {
+    title.textContent = 'One-Off Blog';
+    sub.textContent = 'Write a blog without a scheduled title';
+    actions.innerHTML = '';
+    renderOneOff();
+  } else if (state.activeView === 'client' && state.activeClient) {
+    title.textContent = state.activeClient.name;
+    sub.textContent = state.activeClient.vertical || 'Client';
+    actions.innerHTML = `
+      <button class="btn btn-secondary btn-sm" onclick="openClientModal('${state.activeClient.id}')">⚙️ Edit Client</button>
+    `;
+    renderClientView();
+  }
+}
+
+// ── DASHBOARD ──
+function renderDashboard() {
+  const content = document.getElementById('mainContent');
+  const total = state.clients.length;
+  content.innerHTML = `
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value">${total}</div>
+        <div class="stat-label">Total Clients</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">–</div>
+        <div class="stat-label">Blogs Generated</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">–</div>
+        <div class="stat-label">Titles Pending Approval</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">–</div>
+        <div class="stat-label">Published This Month</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Getting Started</div>
+      <div style="font-size:14px; line-height:1.7; color:var(--muted);">
+        <p style="margin-bottom:10px;">Select a client from the sidebar to manage their blog pipeline, or create a new client to get started.</p>
+        <p>Each client has their own: brand voice profile, sitemap reference, brand rules log, title queue, and blog history.</p>
+      </div>
+    </div>
+    ${total > 0 ? `
+    <div class="card">
+      <div class="card-title">All Clients</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Client</th><th>Vertical</th><th>WordPress</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${state.clients.map(c => `
+              <tr>
+                <td style="font-weight:500;">${c.name}</td>
+                <td>${c.vertical || '–'}</td>
+                <td>${c.wp_url ? `<span style="color:var(--green); font-size:12px;">✓ Configured</span>` : `<span style="color:var(--muted); font-size:12px;">Not set</span>`}</td>
+                <td>
+                  <button class="btn btn-secondary btn-sm" onclick="selectClient('${c.id}')">Open</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>` : ''}
+  `;
+}
+
+// ── ONE-OFF ──
+function renderOneOff() {
+  const content = document.getElementById('mainContent');
+  if (!state.clients.length) {
+    content.innerHTML = `<div class="card"><div class="empty-state"><div class="icon">👤</div><div class="title">No clients yet</div><div class="desc">Create a client first before writing one-off blogs.</div></div></div>`;
+    return;
+  }
+  content.innerHTML = `
+    <div class="card" style="max-width:680px;">
+      <div class="card-title">Write a One-Off Blog</div>
+      <div class="form-group">
+        <label class="form-label">Client *</label>
+        <select class="form-select" id="oneOffClient">
+          <option value="">Select a client...</option>
+          ${state.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Blog Topic / Title *</label>
+        <input class="form-input" id="oneOffTitle" placeholder="e.g. What to Expect at Your First Hormone Consultation" />
+        <p class="form-hint">You can be descriptive here — the AI will refine it into a compelling title</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Target Keyword (optional)</label>
+        <input class="form-input" id="oneOffKeyword" placeholder="e.g. hormone therapy consultation" />
+      </div>
+      <button class="btn btn-primary" onclick="generateOneOff()" id="oneOffBtn">
+        ✍️ Generate Blog
+      </button>
+    </div>
+    <div id="oneOffResult"></div>
+  `;
+}
+
+async function generateOneOff() {
+  const clientId = document.getElementById('oneOffClient').value;
+  const title = document.getElementById('oneOffTitle').value.trim();
+  const keyword = document.getElementById('oneOffKeyword').value.trim();
+  if (!clientId || !title) { alert('Please select a client and enter a blog topic'); return; }
+
+  const btn = document.getElementById('oneOffBtn');
+  const result = document.getElementById('oneOffResult');
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> Generating...`;
+  result.innerHTML = `<div class="card"><div class="generation-progress"><div class="spinner spinner-dark" style="width:28px;height:28px;margin:0 auto;border-width:3px;"></div><p>Writing your blog — this takes about 30–60 seconds...</p></div></div>`;
+
+  try {
+    const res = await fetch(`${API}/api/generate-blog`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, title, targetKeyword: keyword, isOneOff: true })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    result.innerHTML = '';
+    openBlogView(data.blog);
+  } catch (e) {
+    result.innerHTML = `<div class="alert alert-error">❌ ${e.message}</div>`;
+  }
+  btn.disabled = false;
+  btn.innerHTML = '✍️ Generate Blog';
+}
+
+// ── CLIENT VIEW ──
+async function renderClientView() {
+  const content = document.getElementById('mainContent');
+  content.innerHTML = `
+    <div class="tabs">
+      <div class="tab ${state.clientTab === 'titles' ? 'active' : ''}" onclick="setClientTab('titles')">📋 Title Queue</div>
+      <div class="tab ${state.clientTab === 'blogs' ? 'active' : ''}" onclick="setClientTab('blogs')">📄 Blog Queue</div>
+      <div class="tab ${state.clientTab === 'profile' ? 'active' : ''}" onclick="setClientTab('profile')">🏢 Client Profile</div>
+      <div class="tab ${state.clientTab === 'rules' ? 'active' : ''}" onclick="setClientTab('rules')">📏 Brand Rules</div>
+    </div>
+    <div id="clientTabContent"></div>
+  `;
+  renderClientTab();
+}
+
+function setClientTab(tab) {
+  state.clientTab = tab;
+  document.querySelectorAll('.tab').forEach(el => {
+    el.classList.toggle('active', el.textContent.includes(
+      { titles: 'Title', blogs: 'Blog', profile: 'Profile', rules: 'Rules' }[tab]
+    ));
+  });
+  renderClientTab();
+}
+
+function renderClientTab() {
+  const tab = state.clientTab;
+  if (tab === 'titles') renderTitlesTab();
+  else if (tab === 'blogs') renderBlogsTab();
+  else if (tab === 'profile') renderProfileTab();
+  else if (tab === 'rules') renderRulesTab();
+}
+
+// ── TITLES TAB ──
+async function renderTitlesTab() {
+  const el = document.getElementById('clientTabContent');
+  el.innerHTML = `<div style="text-align:center;padding:40px;"><div class="spinner spinner-dark" style="margin:0 auto;width:28px;height:28px;border-width:3px;"></div></div>`;
+
+  const [titlesRes] = await Promise.all([
+    fetch(`${API}/api/clients/${state.activeClient.id}/titles`).then(r => r.json()),
+  ]);
+
+  const proposed = titlesRes.filter(t => t.status === 'proposed');
+  const approved = titlesRes.filter(t => t.status === 'approved');
+  const others = titlesRes.filter(t => !['proposed', 'approved'].includes(t.status));
+
+  el.innerHTML = `
+    <!-- Generate Section -->
+    <div class="card">
+      <div class="card-title">Generate New Titles</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Number of Titles</label>
+          <select class="form-select" id="titleCount">
+            <option value="6">6 titles</option>
+            <option value="12" selected>12 titles (recommended)</option>
+            <option value="24">24 titles</option>
+            <option value="50">50 titles</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Topic Direction (optional)</label>
+          <input class="form-input" id="topicDirection" placeholder="e.g. Focus on weight loss and hormones this quarter" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Override Target Keywords (optional)</label>
+        <input class="form-input" id="titleKeywords" placeholder="Leave blank to use client profile keywords" />
+      </div>
+      <button class="btn btn-primary" onclick="generateTitles()" id="generateTitlesBtn">
+        🎯 Generate Titles
+      </button>
+    </div>
+
+    <!-- Proposed Titles -->
+    ${proposed.length ? `
+    <div class="card">
+      <div class="card-title">
+        Proposed Titles
+        <span style="font-size:12px; color:var(--muted); font-weight:400;">${proposed.length} awaiting review</span>
+      </div>
+      <div id="proposedTitlesList">
+        ${proposed.map(t => renderTitleCard(t)).join('')}
+      </div>
+    </div>` : ''}
+
+    <!-- Approved Titles -->
+    ${approved.length ? `
+    <div class="card">
+      <div class="card-title">
+        Approved — Ready to Write
+        <span style="font-size:12px; color:var(--green); font-weight:400;">${approved.length} approved</span>
+      </div>
+      ${approved.map(t => renderTitleCard(t)).join('')}
+    </div>` : ''}
+
+    <!-- Others -->
+    ${others.length ? `
+    <div class="card">
+      <div class="card-title">In Progress / Completed</div>
+      ${others.map(t => renderTitleCard(t)).join('')}
+    </div>` : ''}
+
+    ${!titlesRes.length ? `
+    <div class="card">
+      <div class="empty-state">
+        <div class="icon">🎯</div>
+        <div class="title">No titles yet</div>
+        <div class="desc">Generate your first batch of blog titles above.</div>
+      </div>
+    </div>` : ''}
+  `;
+}
+
+function renderTitleCard(t) {
+  const canGenerate = t.status === 'approved';
+  return `
+    <div class="title-card" id="titleCard_${t.id}">
+      <div style="flex:1;">
+        <div class="title-text">${t.title}</div>
+        ${t.target_keyword ? `<div class="title-kw">🔑 ${t.target_keyword}</div>` : ''}
+        ${t.rationale ? `<div class="title-rationale">${t.rationale}</div>` : ''}
+        ${t.notes ? `<div style="font-size:12px; color:var(--warning); margin-top:3px;">📝 ${t.notes}</div>` : ''}
+      </div>
+      <div class="title-actions">
+        <span class="badge badge-${t.status}">${formatStatus(t.status)}</span>
+        ${t.status === 'proposed' ? `
+          <button class="btn btn-secondary btn-sm" onclick="updateTitleStatus('${t.id}', 'approved')">✓ Approve</button>
+          <button class="btn btn-secondary btn-sm" onclick="editTitle('${t.id}')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="updateTitleStatus('${t.id}', 'rejected')">✕</button>
+        ` : ''}
+        ${canGenerate ? `
+          <button class="btn btn-primary btn-sm" onclick="openGenerateModal('${t.id}', \`${escapeJs(t.title)}\`, \`${escapeJs(t.target_keyword || '')}\`)">✍️ Write</button>
+        ` : ''}
+        ${t.status === 'rejected' ? `
+          <button class="btn btn-secondary btn-sm" onclick="updateTitleStatus('${t.id}', 'proposed')">↩ Restore</button>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+async function generateTitles() {
+  const btn = document.getElementById('generateTitlesBtn');
+  const count = document.getElementById('titleCount').value;
+  const topicDirection = document.getElementById('topicDirection').value.trim();
+  const targetKeywords = document.getElementById('titleKeywords').value.trim();
+
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> Generating ${count} titles...`;
+
+  try {
+    const res = await fetch(`${API}/api/clients/${state.activeClient.id}/generate-titles`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ count, topicDirection, targetKeywords })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    await renderTitlesTab();
+  } catch (e) {
+    alert(`Failed to generate titles: ${e.message}`);
+  }
+  btn.disabled = false;
+  btn.innerHTML = '🎯 Generate Titles';
+}
+
+async function updateTitleStatus(titleId, status) {
+  await fetch(`${API}/api/titles/${titleId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status })
+  });
+  renderTitlesTab();
+}
+
+function editTitle(titleId) {
+  const card = document.getElementById(`titleCard_${titleId}`);
+  const titleEl = card.querySelector('.title-text');
+  const kwEl = card.querySelector('.title-kw');
+  const current = titleEl.textContent;
+  const currentKw = kwEl ? kwEl.textContent.replace('🔑 ', '') : '';
+
+  titleEl.innerHTML = `<input class="form-input" id="editTitleInput_${titleId}" value="${escapeHtml(current)}" style="margin-bottom:6px;" />`;
+  if (kwEl) kwEl.innerHTML = `<input class="form-input" id="editKwInput_${titleId}" value="${escapeHtml(currentKw)}" placeholder="Target keyword" style="font-size:12px;" />`;
+
+  const actions = card.querySelector('.title-actions');
+  actions.innerHTML = `
+    <button class="btn btn-primary btn-sm" onclick="saveEditTitle('${titleId}')">Save</button>
+    <button class="btn btn-secondary btn-sm" onclick="renderTitlesTab()">Cancel</button>
+  `;
+}
+
+async function saveEditTitle(titleId) {
+  const title = document.getElementById(`editTitleInput_${titleId}`)?.value.trim();
+  const keyword = document.getElementById(`editKwInput_${titleId}`)?.value.trim();
+  await fetch(`${API}/api/titles/${titleId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, target_keyword: keyword, status: 'proposed' })
+  });
+  renderTitlesTab();
+}
+
+// ── GENERATE BLOG MODAL ──
+function openGenerateModal(titleId, title, keyword) {
+  document.getElementById('generateModalTitle').textContent = 'Generate Blog';
+  document.getElementById('generateModalBody').innerHTML = `
+    <div class="alert alert-info">✍️ You're about to write a full blog for: <strong>${escapeHtml(title)}</strong></div>
+    <div class="form-group">
+      <label class="form-label">Blog Title</label>
+      <input class="form-input" id="genTitle" value="${escapeHtml(title)}" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Target Keyword</label>
+      <input class="form-input" id="genKeyword" value="${escapeHtml(keyword)}" placeholder="e.g. hormone therapy for women" />
+    </div>
+    <div id="genResult"></div>
+    <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:16px;">
+      <button class="btn btn-secondary" onclick="closeModal('generateModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="runGenerate('${titleId}')" id="runGenBtn">✍️ Generate</button>
+    </div>
+  `;
+  document.getElementById('generateModal').style.display = 'flex';
+}
+
+async function runGenerate(titleId) {
+  const title = document.getElementById('genTitle').value.trim();
+  const keyword = document.getElementById('genKeyword').value.trim();
+  const btn = document.getElementById('runGenBtn');
+  const result = document.getElementById('genResult');
+
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> Writing...`;
+  result.innerHTML = `<div class="generation-progress"><div class="spinner spinner-dark" style="width:28px;height:28px;margin:0 auto;border-width:3px;"></div><p>Writing your blog — this takes about 30–60 seconds...</p></div>`;
+
+  try {
+    const res = await fetch(`${API}/api/generate-blog`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId: state.activeClient.id,
+        titleId,
+        title,
+        targetKeyword: keyword,
+        isOneOff: false
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    closeModal('generateModal');
+    openBlogView(data.blog);
+    renderBlogsTab();
+  } catch (e) {
+    result.innerHTML = `<div class="alert alert-error">❌ ${e.message}</div>`;
+    btn.disabled = false;
+    btn.innerHTML = '✍️ Generate';
+  }
+}
+
+// ── BLOGS TAB ──
+async function renderBlogsTab() {
+  if (state.clientTab !== 'blogs') return;
+  const el = document.getElementById('clientTabContent');
+  el.innerHTML = `<div style="text-align:center;padding:40px;"><div class="spinner spinner-dark" style="margin:0 auto;width:28px;height:28px;border-width:3px;"></div></div>`;
+
+  const blogs = await fetch(`${API}/api/clients/${state.activeClient.id}/blogs`).then(r => r.json());
+
+  const byStatus = {
+    draft: blogs.filter(b => b.status === 'draft'),
+    'in-review': blogs.filter(b => b.status === 'in-review'),
+    approved: blogs.filter(b => b.status === 'approved'),
+    published: blogs.filter(b => b.status === 'published'),
+  };
+
+  el.innerHTML = `
+    ${!blogs.length ? `
+    <div class="card">
+      <div class="empty-state">
+        <div class="icon">📄</div>
+        <div class="title">No blogs yet</div>
+        <div class="desc">Approve some titles, then use the Write button to generate blogs.</div>
+      </div>
+    </div>` : Object.entries(byStatus).filter(([,b]) => b.length > 0).map(([status, items]) => `
+    <div class="card">
+      <div class="card-title">
+        ${statusLabel(status)}
+        <span style="font-size:12px; color:var(--muted); font-weight:400;">${items.length} ${items.length === 1 ? 'blog' : 'blogs'}</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Title</th><th>Keyword</th><th>Type</th><th>Date</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${items.map(b => `
+              <tr>
+                <td style="font-weight:500; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${b.title}</td>
+                <td style="font-size:12px; color:var(--muted);">${b.target_keyword || '–'}</td>
+                <td>${b.is_one_off ? `<span style="font-size:11px; color:var(--muted);">One-off</span>` : `<span style="font-size:11px; color:var(--green);">Scheduled</span>`}</td>
+                <td style="font-size:12px; color:var(--muted);">${formatDate(b.created_at)}</td>
+                <td>
+                  <div style="display:flex; gap:6px;">
+                    <button class="btn btn-secondary btn-sm" onclick="viewBlog('${b.id}')">View</button>
+                    <button class="btn btn-secondary btn-sm" onclick="exportBlog('${b.id}')">⬇️ .docx</button>
+                    ${status === 'draft' ? `<button class="btn btn-secondary btn-sm" onclick="moveBlogStatus('${b.id}', 'in-review', this)">→ In Review</button>` : ''}
+                    ${status === 'in-review' ? `<button class="btn btn-primary btn-sm" onclick="moveBlogStatus('${b.id}', 'approved', this)">✓ Approve</button>` : ''}
+                    ${status === 'approved' ? `<button class="btn btn-primary btn-sm" onclick="publishToWp('${b.id}', this)">🚀 Push to WP</button>` : ''}
+                    ${status === 'published' && b.wp_post_id ? `<a href="${state.activeClient.wp_url}/wp-admin/post.php?post=${b.wp_post_id}&action=edit" target="_blank" class="btn btn-secondary btn-sm">WP ↗</a>` : ''}
+                  </div>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    `).join('')}
+  `;
+}
+
+async function viewBlog(blogId) {
+  const blog = await fetch(`${API}/api/blogs/${blogId}`).then(r => r.json());
+  openBlogView(blog);
+}
+
+function openBlogView(blog) {
+  document.getElementById('blogViewTitle').textContent = blog.title;
+  document.getElementById('blogViewBody').innerHTML = `
+    <div class="blog-preview">${renderBlogHtml(blog.content)}</div>
+    ${blog.title_tag || blog.meta_description ? `
+    <div class="meta-box">
+      <div class="meta-box-title">SEO Metadata</div>
+      ${blog.title_tag ? `<div class="meta-field"><span class="meta-field-label">Title Tag</span><span class="meta-field-value">${escapeHtml(blog.title_tag)}</span></div>` : ''}
+      ${blog.meta_description ? `<div class="meta-field"><span class="meta-field-label">Meta Description</span><span class="meta-field-value">${escapeHtml(blog.meta_description)}</span></div>` : ''}
+      ${blog.slug ? `<div class="meta-field"><span class="meta-field-label">Slug</span><span class="meta-field-value">/${blog.slug}</span></div>` : ''}
+      ${blog.target_keyword ? `<div class="meta-field"><span class="meta-field-label">Target Keyword</span><span class="meta-field-value">${escapeHtml(blog.target_keyword)}</span></div>` : ''}
+      ${blog.internal_links_used ? `<div class="meta-field"><span class="meta-field-label">Internal Links</span><span class="meta-field-value">${escapeHtml(blog.internal_links_used)}</span></div>` : ''}
+    </div>` : ''}
+  `;
+  document.getElementById('blogViewFooter').innerHTML = `
+    <span class="badge badge-${blog.status}" style="margin-right:auto;">${formatStatus(blog.status)}</span>
+    <button class="btn btn-secondary" onclick="exportBlog('${blog.id}')">⬇️ Download .docx</button>
+    <button class="btn btn-secondary" onclick="closeModal('blogViewModal')">Close</button>
+  `;
+  document.getElementById('blogViewModal').style.display = 'flex';
+}
+
+function renderBlogHtml(markdown) {
+  if (!markdown) return '';
+  return markdown.split('\n').map(line => {
+    const t = line.trim();
+    if (!t) return '<br/>';
+    if (t.startsWith('# ')) return `<h1>${escapeHtml(t.slice(2))}</h1>`;
+    if (t.startsWith('## ')) return `<h2>${escapeHtml(t.slice(3))}</h2>`;
+    if (t.startsWith('### ')) return `<h3>${escapeHtml(t.slice(4))}</h3>`;
+    if (t.startsWith('- ') || t.startsWith('* ')) return `<ul><li>${escapeHtml(t.slice(2))}</li></ul>`;
+    if (t.startsWith('[Image:')) return `<div class="image-marker">${escapeHtml(t)}</div>`;
+    return `<p>${escapeHtml(t).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')}</p>`;
+  }).join('');
+}
+
+async function moveBlogStatus(blogId, newStatus, btn) {
+  btn.disabled = true;
+  await fetch(`${API}/api/blogs/${blogId}/status`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: newStatus })
+  });
+  renderBlogsTab();
+}
+
+async function exportBlog(blogId) {
+  window.open(`${API}/api/blogs/${blogId}/export`, '_blank');
+}
+
+async function publishToWp(blogId, btn) {
+  if (!confirm('Push this blog to WordPress as a draft post?')) return;
+  btn.disabled = true;
+  btn.textContent = 'Pushing...';
+  try {
+    const res = await fetch(`${API}/api/blogs/${blogId}/publish-to-wp`, { method: 'POST' });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    alert(`✅ Pushed to WordPress! The post is saved as a draft.\n\nEdit it here: ${data.wpEditUrl}`);
+    renderBlogsTab();
+  } catch (e) {
+    alert(`❌ Failed: ${e.message}`);
+    btn.disabled = false;
+    btn.textContent = '🚀 Push to WP';
+  }
+}
+
+// ── PROFILE TAB ──
+async function renderProfileTab() {
+  const el = document.getElementById('clientTabContent');
+  el.innerHTML = `<div style="text-align:center;padding:40px;"><div class="spinner spinner-dark" style="margin:0 auto;width:28px;height:28px;border-width:3px;"></div></div>`;
+
+  const profile = await fetch(`${API}/api/clients/${state.activeClient.id}/profile`).then(r => r.json());
+
+  el.innerHTML = `
+    <div class="card" style="max-width:800px;">
+      <div class="card-title">Brand Voice & Profile</div>
+      <div class="form-group">
+        <label class="form-label">Master Record / Brand Voice</label>
+        <textarea class="form-textarea" id="profileVoice" rows="10" placeholder="Paste the client's master record or brand voice document here. This is injected into every blog generation prompt.">${escapeHtml(profile?.brand_voice || '')}</textarea>
+        <p class="form-hint">This is the primary context the AI uses when writing for this client.</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Target Keywords</label>
+        <textarea class="form-textarea" id="profileKeywords" rows="4" placeholder="List the client's target keywords, one per line or comma-separated. These inform title generation.">${escapeHtml(profile?.target_keywords || '')}</textarea>
+      </div>
+      <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
+    </div>
+
+    <div class="card" style="max-width:800px;">
+      <div class="card-title">
+        Sitemap
+        ${profile?.sitemap_pages?.length ? `<span style="font-size:12px; color:var(--green); font-weight:400;">✓ ${profile.sitemap_pages.length} pages loaded</span>` : ''}
+      </div>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:16px; line-height:1.6;">Upload the client's XML sitemap or a plain text file with one URL per line. This is used to check for keyword cannibalization and suggest internal links.</p>
+      <div class="form-group">
+        <label class="form-label">Upload Sitemap File</label>
+        <input type="file" id="sitemapFile" accept=".xml,.txt" />
+      </div>
+      <button class="btn btn-secondary" onclick="uploadSitemap()">Upload Sitemap</button>
+      <div id="sitemapResult" style="margin-top:12px;"></div>
+
+      ${profile?.sitemap_pages?.length ? `
+      <div style="margin-top:20px; max-height:240px; overflow-y:auto; border:1px solid var(--border); border-radius:8px;">
+        <table>
+          <thead><tr><th>Page Title</th><th>URL</th></tr></thead>
+          <tbody>
+            ${profile.sitemap_pages.slice(0, 50).map(p => `
+              <tr>
+                <td style="font-size:12px;">${escapeHtml(p.title)}</td>
+                <td style="font-size:11px; color:var(--muted);">${escapeHtml(p.url)}</td>
+              </tr>
+            `).join('')}
+            ${profile.sitemap_pages.length > 50 ? `<tr><td colspan="2" style="font-size:12px; color:var(--muted); text-align:center;">...and ${profile.sitemap_pages.length - 50} more</td></tr>` : ''}
+          </tbody>
+        </table>
+      </div>` : ''}
+    </div>
+
+    <div class="card" style="max-width:800px;">
+      <div class="card-title">WordPress Connection</div>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:16px;">Test the WordPress connection for this client.</p>
+      <button class="btn btn-secondary" onclick="testWpConnection()" id="testWpBtn">Test WP Connection</button>
+      <div id="wpTestResult" style="margin-top:12px;"></div>
+    </div>
+  `;
+}
+
+async function saveProfile() {
+  const brand_voice = document.getElementById('profileVoice').value;
+  const target_keywords = document.getElementById('profileKeywords').value;
+  await fetch(`${API}/api/clients/${state.activeClient.id}/profile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ brand_voice, target_keywords })
+  });
+  showToast('Profile saved');
+}
+
+async function uploadSitemap() {
+  const file = document.getElementById('sitemapFile').files[0];
+  if (!file) { alert('Please select a file first'); return; }
+  const result = document.getElementById('sitemapResult');
+  result.innerHTML = `<div class="alert alert-info">⏳ Processing sitemap...</div>`;
+
+  const form = new FormData();
+  form.append('sitemap', file);
+  const res = await fetch(`${API}/api/clients/${state.activeClient.id}/sitemap`, { method: 'POST', body: form });
+  const data = await res.json();
+  if (data.error) {
+    result.innerHTML = `<div class="alert alert-error">❌ ${data.error}</div>`;
+  } else {
+    result.innerHTML = `<div class="alert alert-success">✅ ${data.count} pages imported from sitemap</div>`;
+    setTimeout(() => renderProfileTab(), 1200);
+  }
+}
+
+async function testWpConnection() {
+  const btn = document.getElementById('testWpBtn');
+  const result = document.getElementById('wpTestResult');
+  btn.disabled = true;
+  btn.textContent = 'Testing...';
+  const res = await fetch(`${API}/api/clients/${state.activeClient.id}/test-wp`, { method: 'POST' });
+  const data = await res.json();
+  result.innerHTML = data.success
+    ? `<div class="alert alert-success">✅ ${data.message}</div>`
+    : `<div class="alert alert-error">❌ ${data.message}</div>`;
+  btn.disabled = false;
+  btn.textContent = 'Test WP Connection';
+}
+
+// ── RULES TAB ──
+async function renderRulesTab() {
+  const el = document.getElementById('clientTabContent');
+  el.innerHTML = `<div style="text-align:center;padding:40px;"><div class="spinner spinner-dark" style="margin:0 auto;width:28px;height:28px;border-width:3px;"></div></div>`;
+
+  const rules = await fetch(`${API}/api/clients/${state.activeClient.id}/rules`).then(r => r.json());
+
+  el.innerHTML = `
+    <div class="card" style="max-width:700px;">
+      <div class="card-title">Add Brand Rule</div>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:16px; line-height:1.6;">Brand rules are injected into every blog generation for this client. Use them to log corrections, preferences, or client-specific requirements that should always apply.</p>
+      <div class="form-group">
+        <textarea class="form-textarea" id="newRule" rows="3" placeholder="e.g. Never use the word 'journey'. Always refer to the provider as Dr. Smith, not by first name."></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="addRule()">Add Rule</button>
+    </div>
+
+    <div class="card" style="max-width:700px;">
+      <div class="card-title">
+        Active Rules
+        <span style="font-size:12px; color:var(--muted); font-weight:400;">${rules.length} rule${rules.length !== 1 ? 's' : ''}</span>
+      </div>
+      ${rules.length ? `
+      <div class="rules-list">
+        ${rules.map(r => `
+          <div class="rule-item">
+            <div class="rule-text">${escapeHtml(r.rule)}</div>
+            <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+              <span class="rule-date">${formatDate(r.created_at)}</span>
+              <button class="btn btn-danger btn-sm" onclick="deleteRule('${r.id}')">Remove</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>` : `
+      <div class="empty-state" style="padding:24px;">
+        <div class="icon">📏</div>
+        <div class="title">No rules yet</div>
+        <div class="desc">Add rules as you receive client feedback or corrections.</div>
+      </div>`}
+    </div>
+  `;
+}
+
+async function addRule() {
+  const rule = document.getElementById('newRule').value.trim();
+  if (!rule) return;
+  await fetch(`${API}/api/clients/${state.activeClient.id}/rules`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rule })
+  });
+  renderRulesTab();
+}
+
+async function deleteRule(ruleId) {
+  if (!confirm('Remove this brand rule?')) return;
+  await fetch(`${API}/api/clients/${state.activeClient.id}/rules/${ruleId}`, { method: 'DELETE' });
+  renderRulesTab();
+}
+
+// ══════════════════════════════════════════════
+// UTILITIES
+// ══════════════════════════════════════════════
+function closeModal(id) {
+  document.getElementById(id).style.display = 'none';
+}
+
+function formatStatus(s) {
+  return { proposed: 'Proposed', approved: 'Approved', rejected: 'Rejected', in_progress: 'In Progress', draft: 'Draft', 'in-review': 'In Review', published: 'Published' }[s] || s;
+}
+
+function statusLabel(s) {
+  return { draft: '📝 Draft', 'in-review': '👀 In Review', approved: '✅ Approved', published: '🚀 Published' }[s] || s;
+}
+
+function formatDate(iso) {
+  if (!iso) return '–';
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function escapeHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function escapeJs(s) {
+  if (!s) return '';
+  return String(s).replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/\$/g,'\\$');
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:var(--dark);color:white;padding:10px 18px;border-radius:8px;font-size:13px;z-index:9999;font-family:var(--font-ui);';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2500);
+}
+
+// ══════════════════════════════════════════════
+// BOOT
+// ══════════════════════════════════════════════
+init();
+</script>
+</body>
+</html>
