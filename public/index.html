@@ -211,7 +211,12 @@
   <div class="modal">
     <div class="modal-header"><span class="modal-title">Push to WordPress</span><button class="modal-close" onclick="closeModal('wpPushModal')">✕</button></div>
     <div class="modal-body">
-      <div class="alert alert-info">This will create a <strong>draft post</strong> in WordPress. You can publish it from the dashboard once it's ready.</div>
+      <div class="alert alert-info">Blogs are pushed as drafts by default. Set a future publish date to schedule it, or leave blank to keep as draft.</div>
+      <div class="form-group">
+        <label class="form-label">Publish Date (optional)</label>
+        <input type="date" class="form-input" id="wpPublishDate" />
+        <p class="form-hint">If a future date is set, the post will be scheduled to go live automatically. Leave blank to save as a plain draft.</p>
+      </div>
       <div class="form-group">
         <label class="form-label">Featured Image (optional)</label>
         <input type="file" id="wpFeaturedImage" accept="image/jpeg,image/png,image/webp,image/gif" />
@@ -219,7 +224,7 @@
       </div>
       <div id="wpPushResult"></div>
     </div>
-    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('wpPushModal')">Cancel</button><button class="btn btn-primary" onclick="executePushToWp()" id="wpPushBtn">🚀 Push as Draft</button></div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('wpPushModal')">Cancel</button><button class="btn btn-primary" onclick="executePushToWp()" id="wpPushBtn">🚀 Push to WordPress</button></div>
   </div>
 </div>
 
@@ -361,16 +366,22 @@ async function renderTitlesTab() {
 }
 
 function renderTitleCard(t) {
+  const needsReviewFlag = t.needs_review ? `<span style="display:inline-flex;align-items:center;gap:4px;background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;">⚠️ Client Suggestion</span>` : '';
+  const approvedFlag = t.client_approved ? `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--light-green);color:var(--green);font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;">✓ Client Approved</span>` : '';
+  const suggestionBlock = t.client_suggestion ? `<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;padding:8px 12px;margin-top:8px;font-size:12px;line-height:1.5;"><strong style="color:#92400E;">Client note:</strong> ${escapeHtml(t.client_suggestion)}</div>` : '';
   return `<div class="title-card" id="titleCard_${t.id}">
     <div style="flex:1;">
+      ${t.schedule_slot ? `<div style="font-size:11px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">${escapeHtml(t.schedule_slot)}</div>` : ''}
       <div style="font-size:14px;font-weight:500;line-height:1.4;">${escapeHtml(t.title)}</div>
       ${t.target_keyword?`<div style="font-size:12px;color:var(--muted);margin-top:3px;">🔑 ${escapeHtml(t.target_keyword)}</div>`:''}
       ${t.rationale?`<div style="font-size:12px;color:var(--muted);margin-top:4px;font-style:italic;line-height:1.4;">${escapeHtml(t.rationale)}</div>`:''}
+      ${suggestionBlock}
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">${approvedFlag}${needsReviewFlag}</div>
     </div>
     <div class="title-actions">
       <span class="badge badge-${t.status}">${formatStatus(t.status)}</span>
       ${t.status==='proposed'?`<button class="btn btn-secondary btn-sm" onclick="updateTitleStatus('${t.id}','approved')">✓ Approve</button><button class="btn btn-secondary btn-sm" onclick="editTitle('${t.id}')">✏️</button><button class="btn btn-danger btn-sm" onclick="updateTitleStatus('${t.id}','rejected')">✕</button>`:''}
-      ${t.status==='approved'?`<button class="btn btn-primary btn-sm" onclick="openGenerateModal('${t.id}',\`${escapeJs(t.title)}\`,\`${escapeJs(t.target_keyword||'')}\`)">✍️ Write</button>`:''}
+      ${t.status==='approved'?`<button class="btn btn-primary btn-sm" onclick="openGenerateModal('${t.id}',\`${escapeJs(t.title)}\`,\`${escapeJs(t.target_keyword||'')}\`,\`${escapeJs(t.scheduled_date||'')}\`)">✍️ Write</button>`:''}
       ${t.status==='rejected'?`<button class="btn btn-secondary btn-sm" onclick="updateTitleStatus('${t.id}','proposed')">↩ Restore</button>`:''}
     </div>
   </div>`;
@@ -388,16 +399,16 @@ async function generateTitles() {
 }
 
 async function shareWithClient() {
-  const btn = document.querySelector('#shareBtn') || event.target;
-  const origText = event.target.textContent;
-  event.target.disabled = true; event.target.textContent = 'Generating...';
+  const btn = event.target;
+  const origText = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Copying...';
   try {
     const data = await fetch(`${API}/api/clients/${state.activeClient.id}/share-titles`, { method:'POST' }).then(r=>r.json());
     if (data.error) throw new Error(data.error);
     await navigator.clipboard.writeText(data.shareUrl);
-    showToast(`Link copied! (${data.count} titles)`);
+    showToast(`✅ Link copied! (${data.count} titles)`);
   } catch(e) { alert(`Error: ${e.message}`); }
-  event.target.disabled = false; event.target.textContent = origText;
+  btn.disabled = false; btn.textContent = origText;
 }
 
 async function updateTitleStatus(titleId, status) {
@@ -424,12 +435,13 @@ async function saveEditTitle(titleId) {
 }
 
 // ── GENERATE BLOG MODAL ────────────────────────────────────────────
-function openGenerateModal(titleId, title, keyword) {
+function openGenerateModal(titleId, title, keyword, scheduledDate) {
   document.getElementById('generateModalTitle').textContent = 'Generate Blog';
   document.getElementById('generateModalBody').innerHTML = `
     <div class="alert alert-info">✍️ Writing a blog for: <strong>${escapeHtml(title)}</strong></div>
     <div class="form-group"><label class="form-label">Blog Title</label><input class="form-input" id="genTitle" value="${escapeHtml(title)}" /></div>
     <div class="form-group"><label class="form-label">Target Keyword</label><input class="form-input" id="genKeyword" value="${escapeHtml(keyword)}" placeholder="e.g. hormone therapy consultation" /></div>
+    ${scheduledDate ? `<div class="form-group"><label class="form-label">Scheduled Publish Date</label><input class="form-input" type="date" id="genScheduledDate" value="${escapeHtml(scheduledDate)}" /><p class="form-hint">Pre-filled from the blog schedule — can be adjusted</p></div>` : ''}
     <div id="genResult"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-secondary" onclick="closeModal('generateModal')">Cancel</button>
@@ -445,7 +457,7 @@ async function runGenerate(titleId) {
   btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Writing...`;
   result.innerHTML = `<div class="generation-progress"><div class="spinner spinner-dark" style="width:28px;height:28px;margin:0 auto;border-width:3px;"></div><p>Writing your blog — this takes about 30–60 seconds...</p></div>`;
   try {
-    const data = await fetch(`${API}/api/generate-blog`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({clientId:state.activeClient.id,titleId,title,targetKeyword:keyword,isOneOff:false}) }).then(r=>r.json());
+    const data = await fetch(`${API}/api/generate-blog`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({clientId:state.activeClient.id,titleId,title,targetKeyword:keyword,isOneOff:false, scheduledDate: document.getElementById('genScheduledDate')?.value || null}) }).then(r=>r.json());
     if (data.error) throw new Error(data.error);
     closeModal('generateModal');
     openBlogView(data.blog);
@@ -466,18 +478,18 @@ async function renderBlogsTab() {
     : Object.entries(groups).filter(([,b])=>b.length).map(([status,items])=>`
     <div class="card">
       <div class="card-title">${statusIcon[status]} ${formatStatus(status)} <span style="font-size:12px;color:var(--muted);font-weight:400;">${items.length} blog${items.length!==1?'s':''}</span></div>
-      <div class="table-wrap"><table><thead><tr><th>Title</th><th>Keyword</th><th>Type</th><th>Date</th><th>Actions</th></tr></thead><tbody>
+      <div class="table-wrap"><table><thead><tr><th>Title</th><th>Keyword</th><th>Type</th><th>Scheduled</th><th>Actions</th></tr></thead><tbody>
         ${items.map(b=>`<tr>
-          <td style="font-weight:500;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(b.title)}">${escapeHtml(b.title)}</td>
+          <td style="font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(b.title)}">${escapeHtml(b.title)}</td>
           <td style="font-size:12px;color:var(--muted);">${b.target_keyword||'–'}</td>
           <td><span style="font-size:11px;color:${b.is_one_off?'var(--muted)':'var(--green)'};">${b.is_one_off?'One-Off':'From Queue'}</span></td>
-          <td style="font-size:12px;color:var(--muted);">${formatDate(b.created_at)}</td>
+          <td style="font-size:12px;color:var(--muted);">${b.scheduled_date ? formatDate(b.scheduled_date) : '–'}</td>
           <td><div style="display:flex;gap:6px;flex-wrap:wrap;">
             <button class="btn btn-secondary btn-sm" onclick="viewBlog('${b.id}')">View</button>
             <button class="btn btn-secondary btn-sm" onclick="exportBlog('${b.id}')">⬇️ .docx</button>
             ${status==='draft'?`<button class="btn btn-secondary btn-sm" onclick="moveBlogStatus('${b.id}','in-review',this)">→ In Review</button>`:''}
             ${status==='in-review'?`<button class="btn btn-primary btn-sm" onclick="moveBlogStatus('${b.id}','approved',this)">✓ Approve</button>`:''}
-            ${status==='approved'?`<button class="btn btn-primary btn-sm" onclick="openWpPushModal('${b.id}')">🚀 Push to WP</button>`:''}
+            ${status==='approved'?`<button class="btn btn-primary btn-sm" onclick="openWpPushModal('${b.id}','${b.scheduled_date||''}')">🚀 Push to WP</button>`:''}
             ${status==='published'?`<button class="btn btn-secondary btn-sm" onclick="publishWpPost('${b.id}',this)">🌐 Publish Live</button>${b.wp_post_id&&state.activeClient?.wp_url?`<a href="${state.activeClient.wp_url}/wp-admin/post.php?post=${b.wp_post_id}&action=edit" target="_blank" class="btn btn-secondary btn-sm">WP ↗</a>`:''}`:''}
           </div></td>
         </tr>`).join('')}
@@ -553,31 +565,37 @@ async function moveBlogStatus(blogId, status, btn) {
 
 function exportBlog(blogId) { window.open(`${API}/api/blogs/${blogId}/export`, '_blank'); }
 
-function openWpPushModal(blogId) {
+function openWpPushModal(blogId, scheduledDate) {
   state.wpPushBlogId = blogId;
   document.getElementById('wpFeaturedImage').value = '';
+  document.getElementById('wpPublishDate').value = scheduledDate || '';
   document.getElementById('wpPushResult').innerHTML = '';
   document.getElementById('wpPushBtn').disabled = false;
-  document.getElementById('wpPushBtn').textContent = '🚀 Push as Draft';
+  document.getElementById('wpPushBtn').textContent = '🚀 Push to WordPress';
   document.getElementById('wpPushModal').style.display = 'flex';
 }
 
 async function executePushToWp() {
   const btn = document.getElementById('wpPushBtn'), result = document.getElementById('wpPushResult');
   const imageFile = document.getElementById('wpFeaturedImage').files[0];
-  btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Pushing...`;
+  const publishDate = document.getElementById('wpPublishDate').value;
+  btn.disabled = true;
+  const isScheduled = publishDate && new Date(publishDate) > new Date();
+  btn.innerHTML = `<span class="spinner"></span> Pushing...`;
 
   const formData = new FormData();
   if (imageFile) formData.append('featuredImage', imageFile);
+  if (publishDate) formData.append('publishDate', publishDate);
 
   try {
     const res = await fetch(`${API}/api/blogs/${state.wpPushBlogId}/push-to-wp`, { method:'POST', body: formData });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-    result.innerHTML = `<div class="alert alert-success">✅ Pushed to WordPress as draft!${data.wpEditUrl?` <a href="${data.wpEditUrl}" target="_blank" style="color:inherit;font-weight:700;">Edit in WP ↗</a>`:''}</div>`;
+    const statusMsg = isScheduled ? `Scheduled for ${new Date(publishDate).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}` : 'Saved as draft';
+    result.innerHTML = `<div class="alert alert-success">✅ ${statusMsg}!${data.wpEditUrl?` <a href="${data.wpEditUrl}" target="_blank" style="color:inherit;font-weight:700;">Edit in WP ↗</a>`:''}</div>`;
     btn.textContent = 'Done';
     renderBlogsTab();
-  } catch(e) { result.innerHTML=`<div class="alert alert-error">❌ ${e.message}</div>`; btn.disabled=false; btn.textContent='🚀 Push as Draft'; }
+  } catch(e) { result.innerHTML=`<div class="alert alert-error">❌ ${e.message}</div>`; btn.disabled=false; btn.textContent='🚀 Push to WordPress'; }
 }
 
 async function publishWpPost(blogId, btn) {
@@ -607,9 +625,27 @@ async function renderProfileTab() {
       <div class="form-group"><label class="form-label">Master Record / Brand Voice</label><textarea class="form-textarea" id="profileVoice" rows="10" placeholder="Paste the client's master record or brand voice document here. This is injected into every blog generation prompt.">${escapeHtml(profile?.brand_voice||'')}</textarea></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Target Keywords</label><textarea class="form-textarea" id="profileKeywords" rows="4" placeholder="List target keywords, one per line or comma-separated.">${escapeHtml(profile?.target_keywords||'')}</textarea></div>
-        <div class="form-group"><label class="form-label">Location / Service Area</label><input class="form-input" id="profileLocation" value="${escapeHtml(profile?.location||'')}" placeholder="e.g. Austin, TX or Greater Phoenix Area" /><p class="form-hint">Used for local SEO in both title generation and blog writing. Leave blank if location is not relevant.</p></div>
+        <div class="form-group"><label class="form-label">Location / Service Area</label><input class="form-input" id="profileLocation" value="${escapeHtml(profile?.location||'')}" placeholder="e.g. Austin, TX or Greater Phoenix Area" /><p class="form-hint">Used for local SEO in both title generation and blog writing. Leave blank if not relevant.</p></div>
       </div>
       <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
+    </div>
+
+    <div class="card" style="max-width:800px;">
+      <div class="card-title">Blog Schedule</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6;">These settings control how blog titles are assigned to calendar slots when generated. Titles will be spaced evenly across months starting from the schedule start date. The start date can be set in advance for new site builds that aren't live yet.</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Blogs Per Month</label>
+          <input class="form-input" type="number" id="profileBlogsPerMonth" min="1" max="12" value="${profile?.blogs_per_month||2}" />
+          <p class="form-hint">Smart Start / Practice Pro = 2 &nbsp;|&nbsp; Whiz Works = 3 &nbsp;|&nbsp; Custom as needed</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Schedule Start Date</label>
+          <input class="form-input" type="date" id="profileStartDate" value="${profile?.schedule_start_date||''}" />
+          <p class="form-hint">First blog publish date. Set ahead of time for upcoming site launches.</p>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="saveSchedule()">Save Schedule</button>
     </div>
 
     <div class="card" style="max-width:800px;">
@@ -647,6 +683,11 @@ async function renderProfileTab() {
 async function saveProfile() {
   await fetch(`${API}/api/clients/${state.activeClient.id}/profile`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ brand_voice: document.getElementById('profileVoice').value, target_keywords: document.getElementById('profileKeywords').value, location: document.getElementById('profileLocation').value.trim() }) });
   showToast('Profile saved');
+}
+
+async function saveSchedule() {
+  await fetch(`${API}/api/clients/${state.activeClient.id}/profile`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ blogs_per_month: document.getElementById('profileBlogsPerMonth').value, schedule_start_date: document.getElementById('profileStartDate').value || null }) });
+  showToast('Schedule saved');
 }
 
 async function addRule() {

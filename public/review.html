@@ -3,45 +3,81 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Blog Title Review</title>
+  <title>Blog Topic Review</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Lato:wght@400;700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root { --green: #28AB83; --dark: #323547; --white: #fff; --light-green: #E5F5F0; --off-white: #F7FAF9; --border: #E0E5E3; --muted: #6B7280; }
+    :root { --green: #28AB83; --dark: #323547; --white: #fff; --light-green: #E5F5F0; --off-white: #F7FAF9; --border: #E0E5E3; --muted: #6B7280; --danger: #EF4444; --warning: #F59E0B; }
     body { font-family: 'Lato', sans-serif; background: var(--off-white); color: var(--dark); min-height: 100vh; }
     .header { background: var(--dark); padding: 20px; text-align: center; }
     .header .logo { font-family: 'Poppins', sans-serif; font-size: 12px; font-weight: 600; color: var(--green); letter-spacing: 0.1em; text-transform: uppercase; }
     .header h1 { font-family: 'Poppins', sans-serif; font-size: 20px; font-weight: 700; color: var(--white); margin-top: 4px; }
-    .container { max-width: 720px; margin: 0 auto; padding: 36px 20px; }
+    .container { max-width: 740px; margin: 0 auto; padding: 36px 20px 60px; }
     .intro { background: var(--white); border: 1px solid var(--border); border-radius: 12px; padding: 22px 24px; margin-bottom: 24px; }
     .intro h2 { font-family: 'Poppins', sans-serif; font-size: 16px; font-weight: 600; margin-bottom: 8px; }
     .intro p { font-size: 14px; color: var(--muted); line-height: 1.7; }
-    .count-badge { display: inline-block; background: var(--light-green); color: var(--green); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-top: 12px; }
-    .title-card { background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 12px; }
-    .title-num { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
-    .title-text { font-family: 'Poppins', sans-serif; font-size: 15px; font-weight: 600; line-height: 1.4; margin-bottom: 5px; }
-    .title-kw { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-    .title-rationale { font-size: 13px; color: var(--muted); line-height: 1.5; font-style: italic; }
-    .footer { background: var(--white); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin-top: 24px; text-align: center; font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .progress-wrap { margin-top: 16px; }
+    .progress-bar { background: var(--border); border-radius: 20px; height: 7px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--green); border-radius: 20px; transition: width 0.4s ease; }
+    .progress-label { font-size: 12px; color: var(--muted); margin-top: 5px; text-align: right; }
+    .month-group { margin-bottom: 28px; }
+    .month-label { font-family: 'Poppins', sans-serif; font-size: 13px; font-weight: 700; color: var(--dark); letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+    .title-card { background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 10px; transition: border-color 0.2s; }
+    .title-card.approved { border-color: var(--green); background: #F0FBF7; }
+    .title-card.suggested { border-color: #FDE68A; background: #FFFBEB; }
+    .slot-label { font-size: 11px; font-weight: 700; color: var(--green); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
+    .title-card.suggested .slot-label { color: var(--warning); }
+    .title-text { font-family: 'Poppins', sans-serif; font-size: 15px; font-weight: 600; line-height: 1.4; margin-bottom: 4px; }
+    .title-kw { font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+    .title-rationale { font-size: 13px; color: var(--muted); font-style: italic; line-height: 1.5; margin-bottom: 12px; }
+    .title-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .btn { padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; font-family: 'Lato', sans-serif; }
+    .btn-approve { background: var(--green); color: var(--white); }
+    .btn-approve:hover { background: #22977A; }
+    .btn-approve:disabled { background: var(--green); opacity: 1; }
+    .btn-suggest { background: var(--white); color: var(--dark); border: 1px solid var(--border); }
+    .btn-suggest:hover { background: var(--off-white); }
+    .btn-undo { background: var(--white); color: var(--muted); border: 1px solid var(--border); font-size: 12px; padding: 6px 12px; }
+    .btn:disabled { cursor: default; }
+    .status-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 20px; margin-left: auto; }
+    .status-chip.approved { background: var(--light-green); color: var(--green); }
+    .status-chip.suggested { background: #FEF3C7; color: #92400E; }
+    .suggestion-form { margin-top: 12px; }
+    .suggestion-form textarea { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: 'Lato', sans-serif; font-size: 13px; resize: vertical; min-height: 80px; line-height: 1.5; }
+    .suggestion-form textarea:focus { outline: none; border-color: var(--warning); }
+    .suggestion-form .actions { display: flex; gap: 8px; margin-top: 8px; }
+    .btn-submit-suggestion { background: var(--warning); color: var(--white); padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; }
+    .btn-cancel { background: none; border: none; font-size: 13px; color: var(--muted); cursor: pointer; padding: 8px; }
+    .saved-suggestion { background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 6px; padding: 10px 12px; margin-top: 10px; font-size: 13px; line-height: 1.5; }
+    .saved-suggestion strong { color: #92400E; }
+    .summary { background: var(--white); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; display: flex; gap: 20px; justify-content: space-around; margin-top: 24px; }
+    .summary-stat { text-align: center; }
+    .summary-stat .num { font-family: 'Poppins', sans-serif; font-size: 28px; font-weight: 700; }
+    .summary-stat .num.green { color: var(--green); }
+    .summary-stat .num.yellow { color: var(--warning); }
+    .summary-stat .lbl { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .footer-note { background: var(--white); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; margin-top: 16px; text-align: center; font-size: 13px; color: var(--muted); line-height: 1.7; }
     .spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 14px; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .loading { text-align: center; padding: 80px 24px; color: var(--muted); font-size: 15px; }
-    .error { text-align: center; padding: 60px 24px; }
-    .error .icon { font-size: 40px; margin-bottom: 12px; }
-    .error h2 { font-family: 'Poppins', sans-serif; font-size: 18px; margin-bottom: 8px; }
-    .error p { font-size: 14px; color: var(--muted); }
+    .loading { text-align: center; padding: 80px 24px; color: var(--muted); }
+    .error-state { text-align: center; padding: 60px 24px; }
+    .error-state .icon { font-size: 40px; margin-bottom: 12px; }
+    .error-state h2 { font-family: 'Poppins', sans-serif; font-size: 18px; margin-bottom: 8px; }
+    .error-state p { font-size: 14px; color: var(--muted); }
   </style>
 </head>
 <body>
   <div class="header">
     <div class="logo">Medical Marketing Whiz</div>
-    <h1 id="pageTitle">Proposed Blog Topics</h1>
+    <h1 id="pageTitle">Upcoming Blog Topics</h1>
   </div>
-  <div class="container">
-    <div id="app"><div class="loading"><div class="spinner"></div>Loading...</div></div>
+  <div class="container" id="app">
+    <div class="loading"><div class="spinner"></div>Loading your blog schedule...</div>
   </div>
 <script>
   const token = window.location.pathname.split('/review/')[1];
+  let titles = [];
+  let responses = {}; // titleId -> { action: 'approved'|'suggested', suggestion: '' }
 
   async function init() {
     if (!token) { showError('Invalid review link.'); return; }
@@ -49,34 +85,130 @@
       const res = await fetch('/api/review/' + token);
       if (!res.ok) throw new Error();
       const data = await res.json();
-      if (data.clientName) document.getElementById('pageTitle').textContent = 'Proposed Blog Topics — ' + data.clientName;
-      render(data.titles, data.clientName);
-    } catch { showError('This link is invalid or has expired. Please contact your MMW team member for a new one.'); }
+      titles = data.titles || [];
+      if (data.clientName) document.getElementById('pageTitle').textContent = 'Upcoming Blog Topics';
+      // Pre-populate from existing DB state
+      for (const t of titles) {
+        if (t.client_approved) responses[t.id] = { action: 'approved' };
+        else if (t.client_suggestion) responses[t.id] = { action: 'suggested', suggestion: t.client_suggestion };
+      }
+      render(data.clientName);
+    } catch { showError('This link is invalid or has expired. Please reach out to us for a new one.'); }
   }
 
-  function render(titles, clientName) {
-    if (!titles || !titles.length) { showError('No proposed titles found for this client.'); return; }
-    document.getElementById('app').innerHTML = `
+  function groupByMonth(titles) {
+    const groups = {};
+    for (const t of titles) {
+      const key = t.schedule_slot ? t.schedule_slot.split(' — ')[0] : 'Unscheduled';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(t);
+    }
+    return groups;
+  }
+
+  function render(clientName) {
+    const reviewed = Object.keys(responses).length;
+    const approved = Object.values(responses).filter(r => r.action === 'approved').length;
+    const suggested = Object.values(responses).filter(r => r.action === 'suggested').length;
+    const pct = titles.length > 0 ? Math.round((reviewed / titles.length) * 100) : 0;
+    const groups = groupByMonth(titles);
+
+    let html = `
       <div class="intro">
-        <h2>Here are your proposed blog topics${clientName ? ' for ' + esc(clientName) : ''}</h2>
-        <p>Your team has put together the topics below for your upcoming blog schedule. Please review them and share any feedback directly with your MMW contact — let them know which you'd like to keep, swap out, or adjust.</p>
-        <span class="count-badge">${titles.length} topic${titles.length !== 1 ? 's' : ''} proposed</span>
-      </div>
-      ${titles.map((t, i) => `
-        <div class="title-card">
-          <div class="title-num">Topic ${i + 1}</div>
-          <div class="title-text">${esc(t.title)}</div>
-          ${t.target_keyword ? `<div class="title-kw">Target keyword: ${esc(t.target_keyword)}</div>` : ''}
-          ${t.rationale ? `<div class="title-rationale">${esc(t.rationale)}</div>` : ''}
-        </div>`).join('')}
-      <div class="footer">
-        To approve, reject, or request changes to any of these topics, please reply directly to your MMW contact.<br />
-        This page is view-only and will be updated as your team makes changes.
+        <h2>Here are your upcoming blog topics${clientName ? ' for ' + esc(clientName) : ''}</h2>
+        <p>Our team has mapped out your blog schedule below. Please review each topic and let us know if you're happy with it or if you'd like to suggest a change. You can approve topics you love and leave a note on any you'd like us to revisit.</p>
+        <div class="progress-wrap">
+          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+          <div class="progress-label">${reviewed} of ${titles.length} reviewed</div>
+        </div>
       </div>`;
+
+    for (const [month, items] of Object.entries(groups)) {
+      html += `<div class="month-group"><div class="month-label">📅 ${esc(month)}</div>`;
+      for (const t of items) {
+        const r = responses[t.id];
+        const cardClass = r?.action === 'approved' ? 'approved' : r?.action === 'suggested' ? 'suggested' : '';
+        const slotLabel = t.schedule_slot ? t.schedule_slot.split(' — ')[1] || t.schedule_slot : '';
+        html += `<div class="title-card ${cardClass}" id="card_${t.id}">
+          ${slotLabel ? `<div class="slot-label">${esc(slotLabel)}</div>` : ''}
+          <div class="title-text">${esc(t.title)}</div>
+          ${t.target_keyword ? `<div class="title-kw">Focus keyword: ${esc(t.target_keyword)}</div>` : ''}
+          ${t.rationale ? `<div class="title-rationale">${esc(t.rationale)}</div>` : ''}
+          <div class="title-actions">
+            ${!r ? `
+              <button class="btn btn-approve" onclick="approve('${t.id}')">✓ Looks good</button>
+              <button class="btn btn-suggest" onclick="showSuggestionForm('${t.id}')">💬 Suggest a change</button>
+            ` : r.action === 'approved' ? `
+              <span class="status-chip approved">✓ Approved</span>
+              <button class="btn btn-undo" onclick="undo('${t.id}')">Undo</button>
+            ` : `
+              <span class="status-chip suggested">💬 Change requested</span>
+              <button class="btn btn-undo" onclick="undo('${t.id}')">Edit note</button>
+            `}
+          </div>
+          ${r?.action === 'suggested' && r.suggestion ? `<div class="saved-suggestion"><strong>Your note:</strong> ${esc(r.suggestion)}</div>` : ''}
+          <div id="suggForm_${t.id}" style="display:none;" class="suggestion-form">
+            <textarea id="suggText_${t.id}" placeholder="Let us know what you'd like instead — a different subject, a specific topic, or any direction you have in mind. We'll write the title."></textarea>
+            <div class="actions">
+              <button class="btn-submit-suggestion" onclick="submitSuggestion('${t.id}')">Submit Note</button>
+              <button class="btn-cancel" onclick="hideSuggestionForm('${t.id}')">Cancel</button>
+            </div>
+          </div>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+
+    html += `
+      <div class="summary">
+        <div class="summary-stat"><div class="num">${titles.length}</div><div class="lbl">Total Topics</div></div>
+        <div class="summary-stat"><div class="num green">${approved}</div><div class="lbl">Approved</div></div>
+        <div class="summary-stat"><div class="num yellow">${suggested}</div><div class="lbl">Changes Requested</div></div>
+        <div class="summary-stat"><div class="num">${titles.length - reviewed}</div><div class="lbl">Not Yet Reviewed</div></div>
+      </div>
+      <div class="footer-note">Your responses are saved automatically as you go — no need to submit anything. We can see your feedback in real time and will follow up with any updates.</div>`;
+
+    document.getElementById('app').innerHTML = html;
+  }
+
+  async function approve(titleId) {
+    try {
+      await fetch(`/api/review/${token}/respond`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ titleId, action: 'approved' }) });
+      responses[titleId] = { action: 'approved' };
+      render();
+    } catch { alert('Something went wrong — please try again.'); }
+  }
+
+  function showSuggestionForm(titleId) {
+    document.getElementById(`suggForm_${titleId}`).style.display = 'block';
+    document.getElementById(`suggText_${titleId}`).focus();
+  }
+
+  function hideSuggestionForm(titleId) {
+    document.getElementById(`suggForm_${titleId}`).style.display = 'none';
+  }
+
+  async function submitSuggestion(titleId) {
+    const suggestion = document.getElementById(`suggText_${titleId}`).value.trim();
+    if (!suggestion) { alert('Please add a note before submitting.'); return; }
+    try {
+      await fetch(`/api/review/${token}/respond`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ titleId, action: 'suggestion', suggestion }) });
+      responses[titleId] = { action: 'suggested', suggestion };
+      render();
+    } catch { alert('Something went wrong — please try again.'); }
+  }
+
+  async function undo(titleId) {
+    delete responses[titleId];
+    // Clear from DB too
+    try {
+      await fetch(`/api/review/${token}/respond`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ titleId, action: 'undo' }) });
+    } catch {}
+    render();
   }
 
   function showError(msg) {
-    document.getElementById('app').innerHTML = `<div class="error"><div class="icon">🔗</div><h2>Link Not Found</h2><p>${esc(msg)}</p></div>`;
+    document.getElementById('app').innerHTML = `<div class="error-state"><div class="icon">🔗</div><h2>Link Not Found</h2><p>${esc(msg)}</p></div>`;
   }
 
   function esc(s) {

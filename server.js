@@ -67,9 +67,14 @@ app.get('/api/clients/:id/profile', async (req, res) => {
 });
 
 app.post('/api/clients/:id/profile', async (req, res) => {
-  const { brand_voice, target_keywords, location, sitemap_pages } = req.body;
+  const { brand_voice, target_keywords, location, sitemap_pages, blogs_per_month, schedule_start_date } = req.body;
   const { data, error } = await supabase.from('client_profiles')
-    .upsert({ client_id: req.params.id, brand_voice, target_keywords, location, sitemap_pages: sitemap_pages || [] }, { onConflict: 'client_id' })
+    .upsert({
+      client_id: req.params.id, brand_voice, target_keywords, location,
+      sitemap_pages: sitemap_pages || [],
+      blogs_per_month: blogs_per_month ? parseInt(blogs_per_month) : 2,
+      schedule_start_date: schedule_start_date || null
+    }, { onConflict: 'client_id' })
     .select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
@@ -126,29 +131,78 @@ app.delete('/api/clients/:id/rules/:ruleId', async (req, res) => {
 
 app.post('/api/clients/:id/generate-titles', async (req, res) => {
   const { count = 12, topicDirection, targetKeywords } = req.body;
-  const { data: profile } = await supabase.from('client_profiles').select('brand_voice, target_keywords, location, sitemap_pages').eq('client_id', req.params.id).single();
+  const { data: profile } = await supabase.from('client_profiles').select('brand_voice, target_keywords, location, sitemap_pages, blogs_per_month, schedule_start_date').eq('client_id', req.params.id).single();
+
+  // Figure out the next available slot by checking existing proposed/approved titles
+  const { data: existingTitles } = await supabase.from('blog_titles').select('scheduled_date').eq('client_id', req.params.id).in('status', ['proposed', 'approved', 'in_progress']).order('scheduled_date', { ascending: false });
+
+  const blogsPerMonth = profile?.blogs_per_month || 2;
+  const startDate = profile?.schedule_start_date ? new Date(profile.schedule_start_date) : new Date();
+
+  // Find the last assigned date so new titles continue from there
+  let nextSlotDate = new Date(startDate);
+  if (existingTitles && existingTitles.length > 0) {
+    const lastDate = existingTitles.find(t => t.scheduled_date)?.scheduled_date;
+    if (lastDate) nextSlotDate = new Date(lastDate);
+  }
+
+  const titleCount = Math.min(Math.max(parseInt(count), 1), 50);
   const prompt = buildTitlePrompt({
     brandVoice: profile?.brand_voice,
     targetKeywords: targetKeywords || profile?.target_keywords,
     topicDirection,
-    count: Math.min(Math.max(parseInt(count), 1), 50),
+    count: titleCount,
     sitemapReferences: profile?.sitemap_pages || [],
     location: profile?.location
   });
+
   try {
     const message = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 4000, messages: [{ role: 'user', content: prompt }] });
     const raw = message.content[0].text.trim();
     let parsed;
     try { parsed = JSON.parse(raw); }
     catch { const m = raw.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : { titles: [] }; }
-    const toInsert = (parsed.titles || []).map(t => ({ client_id: req.params.id, title: t.title, target_keyword: t.targetKeyword, rationale: t.rationale, status: 'proposed' }));
+
+    // Assign schedule slots to each generated title
+    const toInsert = (parsed.titles || []).map((t, i) => {
+      const slotDate = assignNextSlot(nextSlotDate, blogsPerMonth, existingTitles?.length || 0, i);
+      const monthName = slotDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+      const slotInMonth = getSlotInMonth(slotDate, blogsPerMonth, i);
+      return {
+        client_id: req.params.id,
+        title: t.title,
+        target_keyword: t.targetKeyword,
+        rationale: t.rationale,
+        status: 'proposed',
+        scheduled_date: slotDate.toISOString().split('T')[0],
+        schedule_slot: `${monthName} — Blog ${slotInMonth}`
+      };
+    });
+
     if (toInsert.length > 0) await supabase.from('blog_titles').insert(toInsert);
-    res.json({ titles: parsed.titles || [] });
+    res.json({ titles: parsed.titles || [], inserted: toInsert });
   } catch (err) {
     console.error('Title generation error:', err);
     res.status(500).json({ error: 'Failed to generate titles' });
   }
 });
+
+// Assign a publish date for a given slot index based on blogs_per_month
+function assignNextSlot(baseDate, blogsPerMonth, existingCount, newIndex) {
+  const totalSlot = existingCount + newIndex;
+  const monthOffset = Math.floor(totalSlot / blogsPerMonth);
+  const date = new Date(baseDate);
+  date.setMonth(date.getMonth() + monthOffset);
+  // Space blogs evenly within the month
+  const slotInMonth = (totalSlot % blogsPerMonth);
+  const spacingDays = Math.floor(28 / blogsPerMonth);
+  date.setDate(1 + (slotInMonth * spacingDays));
+  return date;
+}
+
+function getSlotInMonth(date, blogsPerMonth, index) {
+  return (index % blogsPerMonth) + 1;
+}
 
 // ─── BLOG TITLES CRUD ─────────────────────────────────────────────────────────
 
@@ -159,8 +213,11 @@ app.get('/api/clients/:id/titles', async (req, res) => {
 });
 
 app.put('/api/titles/:titleId', async (req, res) => {
-  const { title, target_keyword, status, notes } = req.body;
-  const { data, error } = await supabase.from('blog_titles').update({ title, target_keyword, status, notes }).eq('id', req.params.titleId).select().single();
+  const { title, target_keyword, status, notes, scheduled_date, schedule_slot } = req.body;
+  const updates = { title, target_keyword, status, notes };
+  if (scheduled_date !== undefined) updates.scheduled_date = scheduled_date;
+  if (schedule_slot !== undefined) updates.schedule_slot = schedule_slot;
+  const { data, error } = await supabase.from('blog_titles').update(updates).eq('id', req.params.titleId).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -171,17 +228,46 @@ app.delete('/api/titles/:titleId', async (req, res) => {
   res.json({ success: true });
 });
 
-// ─── SHAREABLE TITLE LINK (read-only) ────────────────────────────────────────
+// ─── CLIENT REVIEW RESPOND ────────────────────────────────────────────────────
+
+// Client approves a title or submits a suggestion via the share link
+app.post('/api/review/:token/respond', async (req, res) => {
+  const { titleId, action, suggestion } = req.body;
+  if (!['approved', 'suggestion', 'undo'].includes(action)) return res.status(400).json({ error: 'Invalid action' });
+
+  try {
+    const decoded = Buffer.from(req.params.token, 'base64url').toString();
+    const clientId = decoded.split(':')[0];
+    const { data: title } = await supabase.from('blog_titles').select('id, client_id').eq('id', titleId).eq('client_id', clientId).single();
+    if (!title) return res.status(404).json({ error: 'Title not found' });
+
+    let updates;
+    if (action === 'approved') {
+      updates = { client_approved: true, needs_review: false, client_suggestion: null };
+    } else if (action === 'suggestion') {
+      updates = { client_suggestion: suggestion, needs_review: true, client_approved: false };
+    } else {
+      updates = { client_approved: false, needs_review: false, client_suggestion: null };
+    }
+
+    const { error } = await supabase.from('blog_titles').update(updates).eq('id', titleId);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+  } catch {
+    res.status(400).json({ error: 'Invalid token' });
+  }
+});
+
+// ─── SHAREABLE TITLE LINK ─────────────────────────────────────────────────────
 
 app.post('/api/clients/:id/share-titles', async (req, res) => {
-  // Generate a simple token tied to the client ID — no DB storage needed for read-only
   const token = Buffer.from(`${req.params.id}:${process.env.SHARE_SECRET || 'mmw-share'}`).toString('base64url');
   const shareUrl = `${req.protocol}://${req.get('host')}/review/${token}`;
   const { data: titles } = await supabase.from('blog_titles').select('id').eq('client_id', req.params.id).eq('status', 'proposed');
   res.json({ shareUrl, count: titles?.length || 0 });
 });
 
-// Public: decode token and return read-only title list
+// Public: decode token and return title list with client response state
 app.get('/api/review/:token', async (req, res) => {
   try {
     const decoded = Buffer.from(req.params.token, 'base64url').toString();
@@ -189,7 +275,11 @@ app.get('/api/review/:token', async (req, res) => {
     if (!clientId) return res.status(404).json({ error: 'Invalid link' });
 
     const [titlesResult, clientResult] = await Promise.all([
-      supabase.from('blog_titles').select('id, title, target_keyword, rationale').eq('client_id', clientId).eq('status', 'proposed').order('created_at'),
+      supabase.from('blog_titles')
+        .select('id, title, target_keyword, rationale, schedule_slot, scheduled_date, client_approved, client_suggestion, needs_review')
+        .eq('client_id', clientId)
+        .eq('status', 'proposed')
+        .order('scheduled_date', { ascending: true }),
       supabase.from('clients').select('name, vertical').eq('id', clientId).single()
     ]);
 
@@ -203,7 +293,7 @@ app.get('/api/review/:token', async (req, res) => {
 // ─── BLOG GENERATION ─────────────────────────────────────────────────────────
 
 app.post('/api/generate-blog', async (req, res) => {
-  const { clientId, titleId, title, targetKeyword, isOneOff = false } = req.body;
+  const { clientId, titleId, title, targetKeyword, isOneOff = false, scheduledDate } = req.body;
   if (!clientId || !title) return res.status(400).json({ error: 'clientId and title are required' });
 
   const [profileResult, rulesResult] = await Promise.all([
@@ -266,7 +356,8 @@ app.post('/api/generate-blog', async (req, res) => {
       title_tag: metadata.titleTag, meta_description: metadata.metaDescription,
       slug: metadata.slug, internal_links_used: metadata.internalLinksUsed,
       faq_json: faqJson, schema_json: schemaJson,
-      status: 'draft', is_one_off: isOneOff
+      status: 'draft', is_one_off: isOneOff,
+      scheduled_date: scheduledDate || null
     };
 
     const { data: savedBlog, error: saveError } = await supabase.from('blogs').insert(blogRecord).select().single();
@@ -284,7 +375,7 @@ app.post('/api/generate-blog', async (req, res) => {
 // ─── BLOGS CRUD ───────────────────────────────────────────────────────────────
 
 app.get('/api/clients/:id/blogs', async (req, res) => {
-  const { data, error } = await supabase.from('blogs').select('id, title, target_keyword, status, is_one_off, created_at, slug, wp_post_id').eq('client_id', req.params.id).order('created_at', { ascending: false });
+  const { data, error } = await supabase.from('blogs').select('id, title, target_keyword, status, is_one_off, created_at, slug, wp_post_id, scheduled_date').eq('client_id', req.params.id).order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -392,7 +483,7 @@ function parseInlineFormatting(text) {
 
 // ─── WORDPRESS PUSH (as draft) ────────────────────────────────────────────────
 
-app.post('/api/blogs/:blogId/push-to-wp', upload.single('featuredImage'), async (req, res) => {
+app.post('/api/blogs/:blogId/push-to-wp', upload.fields([{ name: 'featuredImage', maxCount: 1 }]), async (req, res) => {
   const { data: blog, error: blogError } = await supabase.from('blogs').select('*, clients(wp_url, wp_username, wp_app_password)').eq('id', req.params.blogId).single();
   if (blogError) return res.status(500).json({ error: blogError.message });
 
@@ -405,16 +496,17 @@ app.post('/api/blogs/:blogId/push-to-wp', upload.single('featuredImage'), async 
 
   // Upload featured image if provided
   let featuredMediaId = null;
-  if (req.file) {
+  const imageFile = req.files?.featuredImage?.[0];
+  if (imageFile) {
     try {
       const imgRes = await fetch(`${wpUrl}/wp-json/wp/v2/media`, {
         method: 'POST',
         headers: {
           ...authHeader,
-          'Content-Disposition': `attachment; filename="${req.file.originalname}"`,
-          'Content-Type': req.file.mimetype,
+          'Content-Disposition': `attachment; filename="${imageFile.originalname}"`,
+          'Content-Type': imageFile.mimetype,
         },
-        body: req.file.buffer
+        body: imageFile.buffer
       });
       if (imgRes.ok) {
         const imgData = await imgRes.json();
@@ -447,12 +539,25 @@ app.post('/api/blogs/:blogId/push-to-wp', upload.single('featuredImage'), async 
   const wpPayload = {
     title: blog.title_tag || blog.title,
     content: htmlContent + faqHtml + schemaHtml,
-    status: 'draft',
     slug: blog.slug,
     excerpt: blog.meta_description,
     ...(featuredMediaId && { featured_media: featuredMediaId }),
     meta: { _yoast_wpseo_metadesc: blog.meta_description, _yoast_wpseo_focuskw: blog.target_keyword }
   };
+
+  // Set status and publish date
+  const publishDate = req.body.publishDate;
+  if (publishDate) {
+    const pd = new Date(publishDate);
+    if (pd > new Date()) {
+      wpPayload.status = 'future';
+      wpPayload.date = pd.toISOString();
+    } else {
+      wpPayload.status = 'draft';
+    }
+  } else {
+    wpPayload.status = 'draft';
+  }
 
   try {
     const wpRes = await fetch(`${wpUrl}/wp-json/wp/v2/posts`, {
@@ -463,7 +568,9 @@ app.post('/api/blogs/:blogId/push-to-wp', upload.single('featuredImage'), async 
     if (!wpRes.ok) { const e = await wpRes.text(); return res.status(400).json({ error: `WordPress error: ${e}` }); }
     const wpPost = await wpRes.json();
 
-    await supabase.from('blogs').update({ wp_post_id: wpPost.id, status: 'published' }).eq('id', req.params.blogId);
+    const updateData = { wp_post_id: wpPost.id, status: 'published' };
+    if (req.body.publishDate) updateData.scheduled_publish_date = req.body.publishDate;
+    await supabase.from('blogs').update(updateData).eq('id', req.params.blogId);
 
     res.json({ success: true, wpPostId: wpPost.id, wpEditUrl: `${wpUrl}/wp-admin/post.php?post=${wpPost.id}&action=edit` });
   } catch (err) {
