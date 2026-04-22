@@ -10,7 +10,7 @@ const {
   Document, Packer, Paragraph, TextRun, HeadingLevel,
   AlignmentType, LevelFormat
 } = require('docx');
-const { buildBlogPrompt, buildTitlePrompt } = require('./prompts');
+const { buildBlogPrompt, buildTitlePrompt, buildTitleRewritePrompt, buildClusterPrompt } = require('./prompts');
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -32,22 +32,22 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 // ─── CLIENTS ─────────────────────────────────────────────────────────────────
 
 app.get('/api/clients', async (req, res) => {
-  const { data, error } = await supabase.from('clients').select('id, name, vertical, wp_url, created_at').order('name');
+  const { data, error } = await supabase.from('clients').select('id, name, vertical, wp_url, created_at, assigned_ae').order('name');
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
 app.post('/api/clients', async (req, res) => {
-  const { name, vertical, wp_url, wp_username, wp_app_password } = req.body;
+  const { name, vertical, wp_url, wp_username, wp_app_password, assigned_ae } = req.body;
   if (!name) return res.status(400).json({ error: 'Client name is required' });
-  const { data, error } = await supabase.from('clients').insert({ name, vertical, wp_url, wp_username, wp_app_password }).select().single();
+  const { data, error } = await supabase.from('clients').insert({ name, vertical, wp_url, wp_username, wp_app_password, assigned_ae }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
 app.put('/api/clients/:id', async (req, res) => {
-  const { name, vertical, wp_url, wp_username, wp_app_password } = req.body;
-  const { data, error } = await supabase.from('clients').update({ name, vertical, wp_url, wp_username, wp_app_password }).eq('id', req.params.id).select().single();
+  const { name, vertical, wp_url, wp_username, wp_app_password, assigned_ae } = req.body;
+  const { data, error } = await supabase.from('clients').update({ name, vertical, wp_url, wp_username, wp_app_password, assigned_ae }).eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -67,10 +67,10 @@ app.get('/api/clients/:id/profile', async (req, res) => {
 });
 
 app.post('/api/clients/:id/profile', async (req, res) => {
-  const { brand_voice, target_keywords, location, sitemap_pages, blogs_per_month, schedule_start_date } = req.body;
+  const { brand_voice, target_keywords, location, service_areas, sitemap_pages, blogs_per_month, schedule_start_date } = req.body;
   const { data, error } = await supabase.from('client_profiles')
     .upsert({
-      client_id: req.params.id, brand_voice, target_keywords, location,
+      client_id: req.params.id, brand_voice, target_keywords, location, service_areas,
       sitemap_pages: sitemap_pages || [],
       blogs_per_month: blogs_per_month ? parseInt(blogs_per_month) : 2,
       schedule_start_date: schedule_start_date || null
@@ -131,15 +131,13 @@ app.delete('/api/clients/:id/rules/:ruleId', async (req, res) => {
 
 app.post('/api/clients/:id/generate-titles', async (req, res) => {
   const { count = 12, topicDirection, targetKeywords } = req.body;
-  const { data: profile } = await supabase.from('client_profiles').select('brand_voice, target_keywords, location, sitemap_pages, blogs_per_month, schedule_start_date').eq('client_id', req.params.id).single();
+  const { data: profile } = await supabase.from('client_profiles').select('brand_voice, target_keywords, location, service_areas, sitemap_pages, blogs_per_month, schedule_start_date').eq('client_id', req.params.id).single();
 
-  // Figure out the next available slot by checking existing proposed/approved titles
   const { data: existingTitles } = await supabase.from('blog_titles').select('scheduled_date').eq('client_id', req.params.id).in('status', ['proposed', 'approved', 'in_progress']).order('scheduled_date', { ascending: false });
 
   const blogsPerMonth = profile?.blogs_per_month || 2;
   const startDate = profile?.schedule_start_date ? new Date(profile.schedule_start_date) : new Date();
 
-  // Find the last assigned date so new titles continue from there
   let nextSlotDate = new Date(startDate);
   if (existingTitles && existingTitles.length > 0) {
     const lastDate = existingTitles.find(t => t.scheduled_date)?.scheduled_date;
@@ -153,7 +151,8 @@ app.post('/api/clients/:id/generate-titles', async (req, res) => {
     topicDirection,
     count: titleCount,
     sitemapReferences: profile?.sitemap_pages || [],
-    location: profile?.location
+    location: profile?.location,
+    serviceAreas: profile?.service_areas
   });
 
   try {
@@ -297,14 +296,32 @@ app.post('/api/generate-blog', async (req, res) => {
   if (!clientId || !title) return res.status(400).json({ error: 'clientId and title are required' });
 
   const [profileResult, rulesResult] = await Promise.all([
-    supabase.from('client_profiles').select('brand_voice, sitemap_pages, location').eq('client_id', clientId).single(),
+    supabase.from('client_profiles').select('brand_voice, sitemap_pages, location, service_areas').eq('client_id', clientId).single(),
     supabase.from('brand_rules').select('rule').eq('client_id', clientId).order('created_at')
   ]);
 
   const profile = profileResult.data;
   const rules = (rulesResult.data || []).map(r => r.rule);
 
-  const prompt = buildBlogPrompt({ title, targetKeyword, brandVoice: profile?.brand_voice, brandRules: rules, sitemapReferences: profile?.sitemap_pages || [], location: profile?.location });
+  // Load cluster context if this title belongs to a cluster
+  let clusterContext = null;
+  if (titleId) {
+    const { data: titleData } = await supabase.from('blog_titles').select('cluster_id').eq('id', titleId).single();
+    if (titleData?.cluster_id) {
+      const { data: cluster } = await supabase.from('clusters').select('pillar_topic, pillar_keyword').eq('id', titleData.cluster_id).single();
+      if (cluster) clusterContext = { pillarTopic: cluster.pillar_topic, pillarKeyword: cluster.pillar_keyword };
+    }
+  }
+
+  const prompt = buildBlogPrompt({
+    title, targetKeyword,
+    brandVoice: profile?.brand_voice,
+    brandRules: rules,
+    sitemapReferences: profile?.sitemap_pages || [],
+    location: profile?.location,
+    serviceAreas: profile?.service_areas,
+    clusterContext
+  });
 
   try {
     const message = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 8000, messages: [{ role: 'user', content: prompt }] });
@@ -340,6 +357,7 @@ app.post('/api/generate-blog', async (req, res) => {
       metadata.metaDescription = (mt.match(/Meta Description:\s*(.+)/) || [])[1]?.trim();
       metadata.slug = (mt.match(/Slug:\s*(.+)/) || [])[1]?.trim();
       metadata.targetKeyword = (mt.match(/Target Keyword:\s*(.+)/) || [])[1]?.trim();
+      metadata.wordCount = (mt.match(/Word Count:\s*(\d+)/) || [])[1]?.trim();
       metadata.internalLinksUsed = (mt.match(/Internal Links Used:\s*([\s\S]+)/) || [])[1]?.trim();
     }
 
@@ -355,6 +373,7 @@ app.post('/api/generate-blog', async (req, res) => {
       content: cleanContent,
       title_tag: metadata.titleTag, meta_description: metadata.metaDescription,
       slug: metadata.slug, internal_links_used: metadata.internalLinksUsed,
+      word_count: metadata.wordCount ? parseInt(metadata.wordCount) : null,
       faq_json: faqJson, schema_json: schemaJson,
       status: 'draft', is_one_off: isOneOff
     };
@@ -371,7 +390,213 @@ app.post('/api/generate-blog', async (req, res) => {
   }
 });
 
-// ─── BATCH BLOG GENERATION ───────────────────────────────────────────────────
+// ─── AI TITLE REWRITE FROM CLIENT FEEDBACK ───────────────────────────────────
+
+app.post('/api/titles/:titleId/rewrite', async (req, res) => {
+  const { data: title, error: titleErr } = await supabase
+    .from('blog_titles')
+    .select('title, target_keyword, client_suggestion, client_id')
+    .eq('id', req.params.titleId)
+    .single();
+
+  if (titleErr || !title) return res.status(404).json({ error: 'Title not found' });
+  if (!title.client_suggestion) return res.status(400).json({ error: 'No client suggestion on this title' });
+
+  const [profileResult] = await Promise.all([
+    supabase.from('client_profiles').select('brand_voice, target_keywords, location, sitemap_pages').eq('client_id', title.client_id).single()
+  ]);
+  const profile = profileResult.data;
+
+  const prompt = buildTitleRewritePrompt({
+    originalTitle: title.title,
+    originalKeyword: title.target_keyword,
+    clientNote: title.client_suggestion,
+    brandVoice: profile?.brand_voice,
+    targetKeywords: profile?.target_keywords,
+    location: profile?.location,
+    sitemapReferences: profile?.sitemap_pages || []
+  });
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }]
+    });
+    const raw = message.content[0].text.trim();
+    let parsed;
+    try { parsed = JSON.parse(raw); }
+    catch { const m = raw.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : { alternatives: [] }; }
+    res.json({ alternatives: parsed.alternatives || [] });
+  } catch (err) {
+    console.error('Title rewrite error:', err);
+    res.status(500).json({ error: 'Failed to generate alternatives' });
+  }
+});
+
+// Accept one of the AI alternatives — replaces the title and clears the suggestion flag
+app.post('/api/titles/:titleId/accept-rewrite', async (req, res) => {
+  const { title, targetKeyword } = req.body;
+  if (!title) return res.status(400).json({ error: 'Title is required' });
+  const { data, error } = await supabase
+    .from('blog_titles')
+    .update({ title, target_keyword: targetKeyword, client_suggestion: null, needs_review: false, client_approved: false })
+    .eq('id', req.params.titleId)
+    .select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+// ─── WP CATEGORIES ───────────────────────────────────────────────────────────
+
+app.get('/api/clients/:id/wp-categories', async (req, res) => {
+  const { data: client } = await supabase.from('clients').select('wp_url, wp_username, wp_app_password').eq('id', req.params.id).single();
+  if (!client?.wp_url) return res.status(400).json({ error: 'No WordPress URL configured' });
+  try {
+    const credentials = Buffer.from(`${client.wp_username}:${client.wp_app_password}`).toString('base64');
+    const wpRes = await fetch(`${client.wp_url.replace(/\/$/, '')}/wp-json/wp/v2/categories?per_page=100`, { headers: { 'Authorization': `Basic ${credentials}` } });
+    if (!wpRes.ok) return res.status(400).json({ error: 'Failed to fetch categories from WordPress' });
+    const cats = await wpRes.json();
+    const simplified = cats.map(c => ({ id: c.id, name: c.name, slug: c.slug, count: c.count }));
+    await supabase.from('client_profiles').upsert({ client_id: req.params.id, wp_categories: simplified }, { onConflict: 'client_id' });
+    res.json(simplified);
+  } catch (err) { res.status(500).json({ error: `Connection failed: ${err.message}` }); }
+});
+
+app.post('/api/clients/:id/wp-categories', async (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'Category name is required' });
+  const { data: client } = await supabase.from('clients').select('wp_url, wp_username, wp_app_password').eq('id', req.params.id).single();
+  if (!client?.wp_url) return res.status(400).json({ error: 'No WordPress URL configured' });
+  try {
+    const credentials = Buffer.from(`${client.wp_username}:${client.wp_app_password}`).toString('base64');
+    const wpRes = await fetch(`${client.wp_url.replace(/\/$/, '')}/wp-json/wp/v2/categories`, {
+      method: 'POST',
+      headers: { 'Authorization': `Basic ${credentials}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    if (!wpRes.ok) { const e = await wpRes.json(); return res.status(400).json({ error: e.message || 'Failed to create category' }); }
+    const cat = await wpRes.json();
+    const { data: profile } = await supabase.from('client_profiles').select('wp_categories').eq('client_id', req.params.id).single();
+    const updated = [...(profile?.wp_categories || []), { id: cat.id, name: cat.name, slug: cat.slug, count: 0 }];
+    await supabase.from('client_profiles').upsert({ client_id: req.params.id, wp_categories: updated }, { onConflict: 'client_id' });
+    res.json({ id: cat.id, name: cat.name, slug: cat.slug });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── DASHBOARD STATS ─────────────────────────────────────────────────────────
+
+app.get('/api/dashboard-stats', async (req, res) => {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [allBlogs, monthBlogs, thirtyBlogs, pendingBlogs, recentActivity, totalClients] = await Promise.all([
+    supabase.from('blogs').select('id', { count: 'exact', head: true }),
+    supabase.from('blogs').select('id', { count: 'exact', head: true }).eq('status', 'published').gte('created_at', startOfMonth),
+    supabase.from('blogs').select('id', { count: 'exact', head: true }).gte('created_at', thirtyDaysAgo),
+    supabase.from('blogs').select('id', { count: 'exact', head: true }).eq('status', 'in-review'),
+    supabase.from('blog_titles').select('id, title, client_id, client_approved, needs_review, updated_at, clients(name)').or('client_approved.eq.true,needs_review.eq.true').gte('updated_at', sevenDaysAgo).order('updated_at', { ascending: false }).limit(15),
+    supabase.from('clients').select('id', { count: 'exact', head: true })
+  ]);
+
+  res.json({
+    totalClients: totalClients.count || 0,
+    totalBlogs: allBlogs.count || 0,
+    blogsThisMonth: monthBlogs.count || 0,
+    blogsLast30Days: thirtyBlogs.count || 0,
+    pendingApproval: pendingBlogs.count || 0,
+    recentActivity: recentActivity.data || []
+  });
+});
+
+// ─── TOPIC CLUSTERS ───────────────────────────────────────────────────────────
+
+app.get('/api/clients/:id/clusters', async (req, res) => {
+  const { data, error } = await supabase.from('clusters').select('*, blog_titles(id, title, status, schedule_slot)').eq('client_id', req.params.id).order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.post('/api/clients/:id/generate-cluster', async (req, res) => {
+  const { pillarTopic, supportingCount = 5 } = req.body;
+  if (!pillarTopic) return res.status(400).json({ error: 'Pillar topic is required' });
+
+  const [profileResult, existingTitlesResult] = await Promise.all([
+    supabase.from('client_profiles').select('brand_voice, target_keywords, location, service_areas, sitemap_pages, blogs_per_month, schedule_start_date').eq('client_id', req.params.id).single(),
+    supabase.from('blog_titles').select('scheduled_date').eq('client_id', req.params.id).in('status', ['proposed', 'approved', 'in_progress']).order('scheduled_date', { ascending: false })
+  ]);
+  const profile = profileResult.data;
+  const existingTitles = existingTitlesResult.data || [];
+
+  const prompt = buildClusterPrompt({
+    pillarTopic, brandVoice: profile?.brand_voice, targetKeywords: profile?.target_keywords,
+    location: profile?.location, serviceAreas: profile?.service_areas,
+    sitemapReferences: profile?.sitemap_pages || [],
+    count: Math.min(Math.max(parseInt(supportingCount), 3), 8)
+  });
+
+  try {
+    const message = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] });
+    const raw = message.content[0].text.trim();
+    let parsed;
+    try { parsed = JSON.parse(raw); }
+    catch { const m = raw.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : null; }
+    if (!parsed) return res.status(500).json({ error: 'Failed to parse cluster response' });
+
+    const { data: cluster, error: clusterErr } = await supabase.from('clusters').insert({
+      client_id: req.params.id, pillar_topic: pillarTopic,
+      pillar_keyword: parsed.pillar?.targetKeyword, pillar_brief: JSON.stringify(parsed.pillar)
+    }).select().single();
+    if (clusterErr) return res.status(500).json({ error: clusterErr.message });
+
+    const blogsPerMonth = profile?.blogs_per_month || 2;
+    const startDate = profile?.schedule_start_date ? new Date(profile.schedule_start_date) : new Date();
+    let nextSlotDate = new Date(startDate);
+    if (existingTitles.length > 0) {
+      const lastDate = existingTitles.find(t => t.scheduled_date)?.scheduled_date;
+      if (lastDate) nextSlotDate = new Date(lastDate);
+    }
+
+    const toInsert = (parsed.supportingTitles || []).map((t, i) => {
+      const slotDate = assignNextSlot(nextSlotDate, blogsPerMonth, existingTitles.length, i);
+      const monthName = slotDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+      return {
+        client_id: req.params.id, cluster_id: cluster.id, cluster_position: i + 1,
+        title: t.title, target_keyword: t.targetKeyword, rationale: t.rationale, status: 'proposed',
+        scheduled_date: slotDate.toISOString().split('T')[0],
+        schedule_slot: `${monthName} — Blog ${(existingTitles.length + i) % blogsPerMonth + 1}`
+      };
+    });
+
+    if (toInsert.length > 0) await supabase.from('blog_titles').insert(toInsert);
+    res.json({ cluster, pillar: parsed.pillar, supportingTitles: parsed.supportingTitles });
+  } catch (err) {
+    console.error('Cluster generation error:', err);
+    res.status(500).json({ error: 'Failed to generate cluster' });
+  }
+});
+
+// ─── BLOG PREVIEW LINK (client-facing) ───────────────────────────────────────
+
+app.post('/api/blogs/:blogId/share', async (req, res) => {
+  const token = Buffer.from(`${req.params.blogId}:${process.env.SHARE_SECRET || 'mmw-share'}`).toString('base64url');
+  const shareUrl = `${req.protocol}://${req.get('host')}/blog-preview/${token}`;
+  res.json({ shareUrl });
+});
+
+app.get('/api/blog-preview/:token', async (req, res) => {
+  try {
+    const decoded = Buffer.from(req.params.token, 'base64url').toString();
+    const blogId = decoded.split(':')[0];
+    const { data: blog, error } = await supabase.from('blogs').select('title, content, title_tag, meta_description, slug, target_keyword, word_count, faq_json, created_at').eq('id', blogId).single();
+    if (error || !blog) return res.status(404).json({ error: 'Blog not found' });
+    res.json(blog);
+  } catch { res.status(404).json({ error: 'Invalid or expired link' }); }
+});
+
+app.get('/blog-preview/:token', (req, res) => res.sendFile('blog-preview.html', { root: 'public' }));
 
 // Returns status of a batch job stored in-memory (sufficient for single-server Render deploy)
 const batchJobs = {};
@@ -389,7 +614,7 @@ app.post('/api/clients/:id/batch-generate', async (req, res) => {
   // Run sequentially in the background
   (async () => {
     const [profileResult, rulesResult] = await Promise.all([
-      supabase.from('client_profiles').select('brand_voice, sitemap_pages, location').eq('client_id', req.params.id).single(),
+      supabase.from('client_profiles').select('brand_voice, sitemap_pages, location, service_areas').eq('client_id', req.params.id).single(),
       supabase.from('brand_rules').select('rule').eq('client_id', req.params.id).order('created_at')
     ]);
     const profile = profileResult.data;
@@ -397,13 +622,21 @@ app.post('/api/clients/:id/batch-generate', async (req, res) => {
 
     for (const titleId of titleIds) {
       try {
-        const { data: titleData } = await supabase.from('blog_titles').select('title, target_keyword').eq('id', titleId).single();
+        const { data: titleData } = await supabase.from('blog_titles').select('title, target_keyword, cluster_id').eq('id', titleId).single();
         if (!titleData) { batchJobs[jobId].failed++; continue; }
+
+        let clusterContext = null;
+        if (titleData.cluster_id) {
+          const { data: cluster } = await supabase.from('clusters').select('pillar_topic, pillar_keyword').eq('id', titleData.cluster_id).single();
+          if (cluster) clusterContext = { pillarTopic: cluster.pillar_topic, pillarKeyword: cluster.pillar_keyword };
+        }
 
         const prompt = buildBlogPrompt({
           title: titleData.title, targetKeyword: titleData.target_keyword,
           brandVoice: profile?.brand_voice, brandRules: rules,
-          sitemapReferences: profile?.sitemap_pages || [], location: profile?.location
+          sitemapReferences: profile?.sitemap_pages || [],
+          location: profile?.location, serviceAreas: profile?.service_areas,
+          clusterContext
         });
 
         const message = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 8000, messages: [{ role: 'user', content: prompt }] });
@@ -476,7 +709,7 @@ app.get('/api/batch-status/:jobId', (req, res) => {
 // ─── BLOGS CRUD ───────────────────────────────────────────────────────────────
 
 app.get('/api/clients/:id/blogs', async (req, res) => {
-  const { data, error } = await supabase.from('blogs').select('id, title, target_keyword, status, is_one_off, created_at, slug, wp_post_id').eq('client_id', req.params.id).order('created_at', { ascending: false });
+  const { data, error } = await supabase.from('blogs').select('id, title, target_keyword, status, is_one_off, created_at, slug, wp_post_id, word_count').eq('client_id', req.params.id).order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -643,6 +876,7 @@ app.post('/api/blogs/:blogId/push-to-wp', upload.fields([{ name: 'featuredImage'
     slug: blog.slug,
     excerpt: blog.meta_description,
     ...(featuredMediaId && { featured_media: featuredMediaId }),
+    ...(req.body.categoryIds?.length && { categories: req.body.categoryIds.map(Number) }),
     meta: { _yoast_wpseo_metadesc: blog.meta_description, _yoast_wpseo_focuskw: blog.target_keyword }
   };
 

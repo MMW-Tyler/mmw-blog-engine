@@ -7,133 +7,149 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Barlow:wght@400;500;600&family=Lato:wght@400;700&display=swap" rel="stylesheet" />
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --green: #28AB83; --dark: #323547; --white: #FFFFFF;
-      --light-green: #E5F5F0; --off-white: #F7FAF9;
-      --border: #E0E5E3; --muted: #6B7280;
-      --danger: #EF4444; --warning: #F59E0B;
-      --font-head: 'Poppins', sans-serif;
-      --font-ui: 'Barlow', sans-serif;
-      --font-body: 'Lato', sans-serif;
-    }
-    body { font-family: var(--font-body); background: var(--off-white); color: var(--dark); min-height: 100vh; }
-    .app { display: flex; height: 100vh; overflow: hidden; }
-    .sidebar { width: 260px; min-width: 260px; background: var(--dark); display: flex; flex-direction: column; overflow-y: auto; }
-    .sidebar-logo { padding: 24px 20px 16px; border-bottom: 1px solid rgba(255,255,255,0.08); }
-    .sidebar-logo .logo-mark { font-family: var(--font-head); font-size: 13px; font-weight: 600; color: var(--green); letter-spacing: 0.08em; text-transform: uppercase; }
-    .sidebar-logo .logo-title { font-family: var(--font-head); font-size: 18px; font-weight: 700; color: var(--white); margin-top: 2px; }
-    .sidebar-section { padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
-    .sidebar-section-label { font-family: var(--font-ui); font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.35); letter-spacing: 0.12em; text-transform: uppercase; padding: 4px 20px 8px; }
-    .sidebar-item { display: flex; align-items: center; gap: 10px; padding: 9px 20px; cursor: pointer; font-family: var(--font-ui); font-size: 14px; color: rgba(255,255,255,0.65); transition: all 0.15s; border-left: 3px solid transparent; }
-    .sidebar-item:hover { background: rgba(255,255,255,0.06); color: var(--white); }
-    .sidebar-item.active { background: rgba(40,171,131,0.15); color: var(--white); border-left-color: var(--green); }
-    .client-list { padding: 8px 0; flex: 1; overflow-y: auto; }
-    .client-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 20px; cursor: pointer; font-family: var(--font-ui); font-size: 13px; color: rgba(255,255,255,0.55); transition: all 0.15s; border-left: 3px solid transparent; }
-    .client-item:hover { background: rgba(255,255,255,0.05); color: var(--white); }
-    .client-item.active { background: rgba(40,171,131,0.12); color: var(--white); border-left-color: var(--green); }
-    .client-item .client-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .client-badge { font-size: 10px; background: rgba(40,171,131,0.25); color: var(--green); padding: 1px 6px; border-radius: 10px; }
-    .sidebar-add-btn { margin: 12px 16px; padding: 9px; background: rgba(40,171,131,0.15); border: 1px solid rgba(40,171,131,0.3); border-radius: 8px; color: var(--green); font-family: var(--font-ui); font-size: 13px; font-weight: 500; cursor: pointer; text-align: center; transition: all 0.15s; }
-    .sidebar-add-btn:hover { background: rgba(40,171,131,0.25); }
-    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-    .topbar { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 32px; height: 60px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-    .topbar-title { font-family: var(--font-head); font-size: 17px; font-weight: 600; }
-    .topbar-sub { font-family: var(--font-ui); font-size: 13px; color: var(--muted); margin-top: 1px; }
-    .topbar-actions { display: flex; gap: 10px; }
-    .content { flex: 1; overflow-y: auto; padding: 28px 32px; }
-    .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; border-radius: 8px; font-family: var(--font-ui); font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; }
-    .btn-primary { background: var(--green); color: var(--white); }
-    .btn-primary:hover { background: #22977A; }
-    .btn-secondary { background: var(--white); color: var(--dark); border: 1px solid var(--border); }
-    .btn-secondary:hover { background: var(--off-white); }
-    .btn-danger { background: #FEF2F2; color: var(--danger); border: 1px solid #FECACA; }
-    .btn-sm { padding: 6px 12px; font-size: 12px; }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .card { background: var(--white); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
-    .card-title { font-family: var(--font-head); font-size: 15px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
-    .form-group { margin-bottom: 16px; }
-    .form-label { display: block; font-family: var(--font-ui); font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 6px; }
-    .form-input, .form-select, .form-textarea { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: var(--font-body); font-size: 14px; color: var(--dark); background: var(--white); transition: border-color 0.15s; }
-    .form-input:focus, .form-select:focus, .form-textarea:focus { outline: none; border-color: var(--green); }
-    .form-textarea { resize: vertical; min-height: 100px; line-height: 1.6; }
-    .form-hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
-    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
-    .stat-card { background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; }
-    .stat-value { font-family: var(--font-head); font-size: 28px; font-weight: 700; }
-    .stat-label { font-family: var(--font-ui); font-size: 12px; color: var(--muted); margin-top: 2px; }
-    .table-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; }
-    th { font-family: var(--font-ui); font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); background: var(--off-white); }
-    td { padding: 12px 14px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: #FAFBFA; }
-    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; font-family: var(--font-ui); }
-    .badge-proposed { background: #EFF6FF; color: #3B82F6; }
-    .badge-approved { background: var(--light-green); color: var(--green); }
-    .badge-rejected { background: #FEF2F2; color: var(--danger); }
-    .badge-in_progress { background: #FFFBEB; color: var(--warning); }
-    .badge-draft { background: var(--off-white); color: var(--muted); }
-    .badge-in-review { background: #EFF6FF; color: #3B82F6; }
-    .badge-published { background: var(--light-green); color: var(--green); }
-    .tabs { display: flex; gap: 2px; border-bottom: 2px solid var(--border); margin-bottom: 24px; }
-    .tab { padding: 10px 18px; font-family: var(--font-ui); font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; }
-    .tab:hover { color: var(--dark); }
-    .tab.active { color: var(--green); border-bottom-color: var(--green); }
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; }
-    .modal { background: var(--white); border-radius: 14px; width: 100%; max-width: 620px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
-    .modal-lg { max-width: 900px; }
-    .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--border); }
-    .modal-title { font-family: var(--font-head); font-size: 16px; font-weight: 600; }
-    .modal-close { background: none; border: none; font-size: 20px; color: var(--muted); cursor: pointer; padding: 4px 8px; border-radius: 6px; }
-    .modal-close:hover { background: var(--off-white); }
-    .modal-body { padding: 24px; }
-    .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; align-items: center; }
-    .blog-preview { font-family: var(--font-body); font-size: 14px; line-height: 1.75; color: var(--dark); }
-    .blog-preview h1 { font-family: var(--font-head); font-size: 22px; font-weight: 700; margin: 16px 0 10px; }
-    .blog-preview h2 { font-family: var(--font-head); font-size: 17px; font-weight: 600; margin: 20px 0 8px; }
-    .blog-preview h3 { font-family: var(--font-head); font-size: 15px; font-weight: 600; margin: 16px 0 6px; }
-    .blog-preview p { margin-bottom: 12px; }
-    .blog-preview ul { margin: 8px 0 12px 20px; }
-    .blog-preview li { margin-bottom: 5px; }
-    .blog-preview .image-marker { background: var(--light-green); border: 1px dashed var(--green); border-radius: 6px; padding: 8px 14px; font-size: 12px; color: var(--green); font-style: italic; margin: 12px 0; }
-    .meta-box { background: var(--off-white); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-top: 20px; }
-    .meta-box-title { font-family: var(--font-ui); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
-    .meta-field { display: flex; gap: 10px; margin-bottom: 8px; font-size: 13px; }
-    .meta-field-label { font-weight: 700; min-width: 130px; color: var(--muted); }
-    .meta-field-value { color: var(--dark); flex: 1; word-break: break-all; }
-    .schema-box { background: #1a1a2e; border-radius: 10px; padding: 16px; margin-top: 16px; }
-    .schema-box-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-    .schema-box-label { font-family: var(--font-ui); font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.45); text-transform: uppercase; letter-spacing: 0.08em; }
-    .schema-box pre { color: #7ee8a2; font-size: 11px; line-height: 1.5; white-space: pre-wrap; font-family: monospace; overflow-x: auto; }
-    .faq-preview { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
-    .faq-item { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; background: var(--off-white); }
-    .faq-q { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
-    .faq-a { font-size: 13px; color: var(--muted); line-height: 1.5; }
-    .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: var(--white); border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
-    .spinner-dark { border-color: rgba(50,53,71,0.2); border-top-color: var(--dark); }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .empty-state { text-align: center; padding: 48px 24px; color: var(--muted); }
-    .empty-state .icon { font-size: 36px; margin-bottom: 12px; }
-    .empty-state .title { font-family: var(--font-head); font-size: 15px; font-weight: 600; color: var(--dark); margin-bottom: 6px; }
-    .empty-state .desc { font-size: 13px; line-height: 1.5; }
-    .alert { padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; }
-    .alert-success { background: var(--light-green); color: #166534; border: 1px solid #86EFAC; }
-    .alert-error { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; }
-    .alert-info { background: #EFF6FF; color: #1E40AF; border: 1px solid #BFDBFE; }
-    .rules-list { display: flex; flex-direction: column; gap: 8px; }
-    .rule-item { display: flex; align-items: flex-start; justify-content: space-between; background: var(--off-white); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; gap: 12px; }
-    .rule-text { font-size: 13px; flex: 1; line-height: 1.5; }
-    .title-card { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; background: var(--white); display: flex; align-items: flex-start; gap: 14px; }
-    .title-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: flex-start; margin-top: 2px; flex-wrap: wrap; }
-    .generation-progress { background: var(--light-green); border: 1px solid var(--green); border-radius: 10px; padding: 24px; text-align: center; }
-    .generation-progress p { font-size: 14px; color: var(--green); margin-top: 10px; }
-    .wp-setup-steps { background: var(--off-white); border-radius: 10px; padding: 16px; margin-top: 8px; }
-    .wp-step { display: flex; gap: 12px; margin-bottom: 10px; font-size: 13px; line-height: 1.5; }
-    .wp-step-num { width: 22px; height: 22px; min-width: 22px; background: var(--dark); color: var(--white); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
-    input[type="file"] { font-family: var(--font-body); font-size: 13px; padding: 8px; border: 1px dashed var(--border); border-radius: 8px; width: 100%; cursor: pointer; }
-    hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--green:#28AB83;--dark:#323547;--white:#FFFFFF;--light-green:#E5F5F0;--off-white:#F7FAF9;--border:#E0E5E3;--muted:#6B7280;--danger:#EF4444;--warning:#F59E0B;--blue:#3B82F6;--font-head:'Poppins',sans-serif;--font-ui:'Barlow',sans-serif;--font-body:'Lato',sans-serif}
+    body{font-family:var(--font-body);background:var(--off-white);color:var(--dark);min-height:100vh}
+    .app{display:flex;height:100vh;overflow:hidden}
+    /* SIDEBAR */
+    .sidebar{width:260px;min-width:260px;background:var(--dark);display:flex;flex-direction:column;overflow-y:auto}
+    .sidebar-logo{padding:24px 20px 16px;border-bottom:1px solid rgba(255,255,255,0.08)}
+    .sidebar-logo .logo-mark{font-family:var(--font-head);font-size:13px;font-weight:600;color:var(--green);letter-spacing:0.08em;text-transform:uppercase}
+    .sidebar-logo .logo-title{font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--white);margin-top:2px}
+    .sidebar-section{padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06)}
+    .sidebar-section-label{font-family:var(--font-ui);font-size:10px;font-weight:600;color:rgba(255,255,255,0.35);letter-spacing:0.12em;text-transform:uppercase;padding:4px 20px 8px}
+    .sidebar-item{display:flex;align-items:center;gap:10px;padding:9px 20px;cursor:pointer;font-family:var(--font-ui);font-size:14px;color:rgba(255,255,255,0.65);transition:all 0.15s;border-left:3px solid transparent}
+    .sidebar-item:hover{background:rgba(255,255,255,0.06);color:var(--white)}
+    .sidebar-item.active{background:rgba(40,171,131,0.15);color:var(--white);border-left-color:var(--green)}
+    .ae-filter{padding:6px 12px;margin:0 12px 8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:7px;color:rgba(255,255,255,0.7);font-family:var(--font-ui);font-size:12px;width:calc(100% - 24px)}
+    .ae-filter:focus{outline:none;border-color:var(--green)}
+    .client-list{padding:4px 0;flex:1;overflow-y:auto}
+    .client-item{display:flex;align-items:center;justify-content:space-between;padding:8px 20px;cursor:pointer;font-family:var(--font-ui);font-size:13px;color:rgba(255,255,255,0.55);transition:all 0.15s;border-left:3px solid transparent}
+    .client-item:hover{background:rgba(255,255,255,0.05);color:var(--white)}
+    .client-item.active{background:rgba(40,171,131,0.12);color:var(--white);border-left-color:var(--green)}
+    .client-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .client-badge{font-size:10px;background:rgba(40,171,131,0.25);color:var(--green);padding:1px 6px;border-radius:10px;flex-shrink:0}
+    .client-alert{width:8px;height:8px;background:#F59E0B;border-radius:50%;flex-shrink:0;margin-left:4px}
+    .sidebar-add-btn{margin:10px 12px 12px;padding:9px;background:rgba(40,171,131,0.15);border:1px solid rgba(40,171,131,0.3);border-radius:8px;color:var(--green);font-family:var(--font-ui);font-size:13px;font-weight:500;cursor:pointer;text-align:center;transition:all 0.15s}
+    .sidebar-add-btn:hover{background:rgba(40,171,131,0.25)}
+    /* MAIN */
+    .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+    .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 32px;height:60px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+    .topbar-title{font-family:var(--font-head);font-size:17px;font-weight:600}
+    .topbar-sub{font-family:var(--font-ui);font-size:13px;color:var(--muted);margin-top:1px}
+    .topbar-actions{display:flex;gap:10px;align-items:center}
+    .content{flex:1;overflow-y:auto;padding:28px 32px}
+    /* BUTTONS */
+    .btn{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:8px;font-family:var(--font-ui);font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all 0.15s}
+    .btn-primary{background:var(--green);color:var(--white)}.btn-primary:hover{background:#22977A}
+    .btn-secondary{background:var(--white);color:var(--dark);border:1px solid var(--border)}.btn-secondary:hover{background:var(--off-white)}
+    .btn-danger{background:#FEF2F2;color:var(--danger);border:1px solid #FECACA}
+    .btn-warning{background:#FFFBEB;color:#92400E;border:1px solid #FDE68A}
+    .btn-sm{padding:6px 12px;font-size:12px}
+    .btn:disabled{opacity:0.5;cursor:not-allowed}
+    /* CARDS */
+    .card{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:20px}
+    .card-title{font-family:var(--font-head);font-size:15px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+    /* FORMS */
+    .form-group{margin-bottom:16px}
+    .form-label{display:block;font-family:var(--font-ui);font-size:12px;font-weight:600;color:var(--muted);letter-spacing:0.04em;text-transform:uppercase;margin-bottom:6px}
+    .form-input,.form-select,.form-textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:14px;color:var(--dark);background:var(--white);transition:border-color 0.15s}
+    .form-input:focus,.form-select:focus,.form-textarea:focus{outline:none;border-color:var(--green)}
+    .form-textarea{resize:vertical;min-height:100px;line-height:1.6}
+    .form-hint{font-size:12px;color:var(--muted);margin-top:4px}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    /* STATS */
+    .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+    .stat-card{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:16px 20px}
+    .stat-value{font-family:var(--font-head);font-size:28px;font-weight:700}
+    .stat-sub{font-size:11px;color:var(--muted);margin-top:1px}
+    .stat-label{font-family:var(--font-ui);font-size:12px;color:var(--muted);margin-top:4px}
+    /* TABLES */
+    .table-wrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse}
+    th{font-family:var(--font-ui);font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);background:var(--off-white)}
+    td{padding:12px 14px;font-size:13px;border-bottom:1px solid var(--border);vertical-align:middle}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:#FAFBFA}
+    /* BADGES */
+    .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;font-family:var(--font-ui)}
+    .badge-proposed{background:#EFF6FF;color:var(--blue)}.badge-approved{background:var(--light-green);color:var(--green)}
+    .badge-rejected{background:#FEF2F2;color:var(--danger)}.badge-in_progress{background:#FFFBEB;color:var(--warning)}
+    .badge-draft{background:var(--off-white);color:var(--muted)}.badge-in-review{background:#EFF6FF;color:var(--blue)}
+    .badge-published{background:var(--light-green);color:var(--green)}
+    /* TABS */
+    .tabs{display:flex;gap:2px;border-bottom:2px solid var(--border);margin-bottom:24px}
+    .tab{padding:10px 18px;font-family:var(--font-ui);font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.15s}
+    .tab:hover{color:var(--dark)}.tab.active{color:var(--green);border-bottom-color:var(--green)}
+    /* MODALS */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+    .modal{background:var(--white);border-radius:14px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2)}
+    .modal-lg{max-width:900px}
+    .modal-header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)}
+    .modal-title{font-family:var(--font-head);font-size:16px;font-weight:600}
+    .modal-close{background:none;border:none;font-size:20px;color:var(--muted);cursor:pointer;padding:4px 8px;border-radius:6px}
+    .modal-close:hover{background:var(--off-white)}
+    .modal-body{padding:24px}
+    .modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;align-items:center}
+    /* BLOG PREVIEW */
+    .blog-preview{font-family:var(--font-body);font-size:14px;line-height:1.75;color:var(--dark)}
+    .blog-preview h1{font-family:var(--font-head);font-size:22px;font-weight:700;margin:16px 0 10px}
+    .blog-preview h2{font-family:var(--font-head);font-size:17px;font-weight:600;margin:20px 0 8px}
+    .blog-preview h3{font-family:var(--font-head);font-size:15px;font-weight:600;margin:16px 0 6px}
+    .blog-preview p{margin-bottom:12px}
+    .blog-preview ul{margin:8px 0 12px 20px}
+    .blog-preview li{margin-bottom:5px}
+    .blog-preview .image-marker{background:var(--light-green);border:1px dashed var(--green);border-radius:6px;padding:8px 14px;font-size:12px;color:var(--green);font-style:italic;margin:12px 0}
+    .meta-box{background:var(--off-white);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:20px}
+    .meta-box-title{font-family:var(--font-ui);font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px}
+    .meta-field{display:flex;gap:10px;margin-bottom:8px;font-size:13px}
+    .meta-field-label{font-weight:700;min-width:130px;color:var(--muted)}
+    .meta-field-value{color:var(--dark);flex:1;word-break:break-all}
+    .schema-box{background:#1a1a2e;border-radius:10px;padding:16px;margin-top:16px}
+    .schema-box-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+    .schema-box-label{font-family:var(--font-ui);font-size:11px;font-weight:600;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.08em}
+    .schema-box pre{color:#7ee8a2;font-size:11px;line-height:1.5;white-space:pre-wrap;font-family:monospace;overflow-x:auto}
+    .faq-preview{margin-top:16px;display:flex;flex-direction:column;gap:8px}
+    .faq-item{border:1px solid var(--border);border-radius:8px;padding:12px 14px;background:var(--off-white)}
+    .faq-q{font-weight:700;font-size:13px;margin-bottom:4px}
+    .faq-a{font-size:13px;color:var(--muted);line-height:1.5}
+    /* MISC */
+    .spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,0.3);border-top-color:var(--white);border-radius:50%;animation:spin 0.7s linear infinite;display:inline-block}
+    .spinner-dark{border-color:rgba(50,53,71,0.2);border-top-color:var(--dark)}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .empty-state{text-align:center;padding:48px 24px;color:var(--muted)}
+    .empty-state .icon{font-size:36px;margin-bottom:12px}
+    .empty-state .title{font-family:var(--font-head);font-size:15px;font-weight:600;color:var(--dark);margin-bottom:6px}
+    .empty-state .desc{font-size:13px;line-height:1.5}
+    .alert{padding:12px 16px;border-radius:8px;font-size:13px;margin-bottom:16px;display:flex;align-items:flex-start;gap:8px;line-height:1.5}
+    .alert-success{background:var(--light-green);color:#166534;border:1px solid #86EFAC}
+    .alert-error{background:#FEF2F2;color:#991B1B;border:1px solid #FECACA}
+    .alert-info{background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE}
+    .alert-warning{background:#FFFBEB;color:#92400E;border:1px solid #FDE68A}
+    .rules-list{display:flex;flex-direction:column;gap:8px}
+    .rule-item{display:flex;align-items:flex-start;justify-content:space-between;background:var(--off-white);border:1px solid var(--border);border-radius:8px;padding:10px 14px;gap:12px}
+    .rule-text{font-size:13px;flex:1;line-height:1.5}
+    .title-card{border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;background:var(--white);display:flex;align-items:flex-start;gap:14px}
+    .title-actions{display:flex;gap:6px;flex-shrink:0;align-items:flex-start;margin-top:2px;flex-wrap:wrap}
+    .generation-progress{background:var(--light-green);border:1px solid var(--green);border-radius:10px;padding:24px;text-align:center}
+    .generation-progress p{font-size:14px;color:var(--green);margin-top:10px}
+    .wp-setup-steps{background:var(--off-white);border-radius:10px;padding:16px;margin-top:8px}
+    .wp-step{display:flex;gap:12px;margin-bottom:10px;font-size:13px;line-height:1.5}
+    .wp-step-num{width:22px;height:22px;min-width:22px;background:var(--dark);color:var(--white);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+    input[type="file"]{font-family:var(--font-body);font-size:13px;padding:8px;border:1px dashed var(--border);border-radius:8px;width:100%;cursor:pointer}
+    hr{border:none;border-top:1px solid var(--border);margin:20px 0}
+    .cluster-card{border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px;background:var(--white)}
+    .cluster-pillar{font-family:var(--font-head);font-size:14px;font-weight:600;margin-bottom:4px}
+    .cluster-kw{font-size:12px;color:var(--muted);margin-bottom:8px}
+    .cluster-titles{display:flex;flex-direction:column;gap:4px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+    .cluster-title-item{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+    .activity-item{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+    .activity-item:last-child{border-bottom:none}
+    .activity-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
+    .activity-dot.approved{background:var(--green)}
+    .activity-dot.suggestion{background:var(--warning)}
+    .cat-chip{display:inline-flex;align-items:center;gap:5px;background:var(--light-green);color:var(--green);font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;margin:2px}
+    .cat-chip button{background:none;border:none;color:var(--green);cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 2px}
   </style>
 </head>
 <body>
@@ -150,6 +166,9 @@
     </div>
     <div class="sidebar-section" style="flex:1;display:flex;flex-direction:column;min-height:0;">
       <div class="sidebar-section-label">Clients</div>
+      <select class="ae-filter" id="aeFilter" onchange="filterByAE()">
+        <option value="">All AEs</option>
+      </select>
       <div class="client-list" id="clientList"><div style="padding:12px 20px;font-size:12px;color:rgba(255,255,255,0.3);">Loading...</div></div>
       <div class="sidebar-add-btn" onclick="openClientModal()">+ New Client</div>
     </div>
@@ -172,7 +191,10 @@
         <div class="form-group"><label class="form-label">Client Name *</label><input class="form-input" id="clientName" placeholder="e.g. Bloom Women's Health" /></div>
         <div class="form-group"><label class="form-label">Vertical</label><select class="form-select" id="clientVertical"><option value="">Select...</option><option>Med Spa / Aesthetics</option><option>OB/GYN</option><option>Functional Medicine</option><option>Urogynecology</option><option>Psychiatry</option><option>Gynecology</option><option>Other</option></select></div>
       </div>
-      <div class="form-group"><label class="form-label">WordPress URL</label><input class="form-input" id="clientWpUrl" placeholder="https://clientwebsite.com" /></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Assigned AE</label><input class="form-input" id="clientAE" placeholder="e.g. Kat, Lori" /></div>
+        <div class="form-group"><label class="form-label">WordPress URL</label><input class="form-input" id="clientWpUrl" placeholder="https://clientwebsite.com" /></div>
+      </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">WP Username</label><input class="form-input" id="clientWpUser" /></div>
         <div class="form-group"><label class="form-label">WP Application Password</label><input class="form-input" id="clientWpPass" type="password" placeholder="xxxx xxxx xxxx xxxx" /></div>
@@ -211,102 +233,88 @@
   <div class="modal">
     <div class="modal-header"><span class="modal-title">Push to WordPress</span><button class="modal-close" onclick="closeModal('wpPushModal')">✕</button></div>
     <div class="modal-body">
-      <div class="alert alert-info">Blogs are pushed as drafts by default. Set a future publish date to schedule it, or leave blank to keep as draft.</div>
+      <div class="alert alert-info">Blogs are pushed as drafts. Set a future publish date to schedule automatically.</div>
+      <div class="form-group"><label class="form-label">Publish Date (optional)</label><input type="date" class="form-input" id="wpPublishDate" /></div>
       <div class="form-group">
-        <label class="form-label">Publish Date (optional)</label>
-        <input type="date" class="form-input" id="wpPublishDate" />
-        <p class="form-hint">If a future date is set, the post will be scheduled to go live automatically. Leave blank to save as a plain draft.</p>
+        <label class="form-label">Categories</label>
+        <div id="wpCategoryPicker" style="min-height:36px;"></div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Featured Image (optional)</label>
-        <input type="file" id="wpFeaturedImage" accept="image/jpeg,image/png,image/webp,image/gif" />
-        <p class="form-hint">Recommended: 1200x628px JPG or PNG. Will upload to the WP Media Library automatically.</p>
-      </div>
+      <div class="form-group"><label class="form-label">Featured Image (optional)</label><input type="file" id="wpFeaturedImage" accept="image/jpeg,image/png,image/webp,image/gif" /><p class="form-hint">Recommended: 1200x628px JPG or PNG</p></div>
       <div id="wpPushResult"></div>
     </div>
     <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('wpPushModal')">Cancel</button><button class="btn btn-primary" onclick="executePushToWp()" id="wpPushBtn">🚀 Push to WordPress</button></div>
   </div>
 </div>
 
+<!-- REWRITE MODAL -->
+<div class="modal-overlay" id="rewriteModal" style="display:none;">
+  <div class="modal modal-lg">
+    <div class="modal-header"><span class="modal-title">AI Title Rewrite</span><button class="modal-close" onclick="closeModal('rewriteModal')">✕</button></div>
+    <div class="modal-body" id="rewriteModalBody"></div>
+  </div>
+</div>
+
 <script>
 const API = '';
-let state = { clients: [], activeClient: null, activeView: 'dashboard', clientTab: 'titles', editingClientId: null, wpPushBlogId: null, batchJobId: null, batchPollInterval: null };
+let state = {
+  clients: [], allClients: [], activeClient: null,
+  activeView: 'dashboard', clientTab: 'titles',
+  editingClientId: null, wpPushBlogId: null,
+  batchJobId: null, batchPollInterval: null,
+  selectedWpCategories: [], wpCategories: []
+};
 
-async function init() { await loadClients(); renderView(); }
+async function init() { await loadClients(); renderView(); loadDashboardStats(); }
 
-async function startBatchGenerate(titleIds) {
-  if (!titleIds || !titleIds.length) return;
-  if (!confirm(`Generate ${titleIds.length} blog${titleIds.length > 1 ? 's' : ''} in the background? You can navigate away — a progress bar will show status.`)) return;
-
-  try {
-    const data = await fetch(`${API}/api/clients/${state.activeClient.id}/batch-generate`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ titleIds })
-    }).then(r => r.json());
-    if (data.error) throw new Error(data.error);
-    state.batchJobId = data.jobId;
-    showBatchProgress(0, data.total, 0);
-    // Poll every 8 seconds
-    state.batchPollInterval = setInterval(() => pollBatchJob(), 8000);
-  } catch(e) { alert(`Failed to start batch generation: ${e.message}`); }
+// ── AE FILTER ─────────────────────────────────────────────────────
+function filterByAE() {
+  const ae = document.getElementById('aeFilter').value;
+  state.clients = ae ? state.allClients.filter(c => c.assigned_ae === ae) : [...state.allClients];
+  renderClientList();
 }
 
-async function pollBatchJob() {
-  if (!state.batchJobId) { clearInterval(state.batchPollInterval); return; }
-  try {
-    const job = await fetch(`${API}/api/batch-status/${state.batchJobId}`).then(r => r.json());
-    if (job.error) { clearInterval(state.batchPollInterval); hideBatchProgress(); return; }
-    showBatchProgress(job.completed, job.total, job.failed);
-    if (job.status === 'done') {
-      clearInterval(state.batchPollInterval);
-      state.batchJobId = null;
-      setTimeout(() => {
-        hideBatchProgress();
-        showToast(`✅ ${job.completed} blog${job.completed !== 1 ? 's' : ''} generated!${job.failed ? ` (${job.failed} failed)` : ''}`);
-        if (state.clientTab === 'blogs') renderBlogsTab();
-        if (state.clientTab === 'titles') renderTitlesTab();
-      }, 1500);
-    }
-  } catch(e) { console.error('Poll error:', e); }
-}
-
-function showBatchProgress(completed, total, failed) {
-  let bar = document.getElementById('batchProgressBar');
-  if (!bar) {
-    bar = document.createElement('div');
-    bar.id = 'batchProgressBar';
-    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:200;background:var(--dark);color:white;padding:10px 24px;display:flex;align-items:center;gap:16px;font-family:var(--font-ui);font-size:13px;box-shadow:0 2px 12px rgba(0,0,0,0.3);';
-    document.body.appendChild(bar);
-  }
-  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-  bar.innerHTML = `
-    <span style="color:var(--green);">⚡</span>
-    <span>Generating blogs in background...</span>
-    <div style="flex:1;background:rgba(255,255,255,0.15);border-radius:10px;height:6px;overflow:hidden;">
-      <div style="width:${pct}%;height:100%;background:var(--green);border-radius:10px;transition:width 0.5s;"></div>
-    </div>
-    <span style="white-space:nowrap;">${completed} / ${total}${failed ? ` <span style="color:#FCA5A5;">(${failed} failed)</span>` : ''}</span>
-  `;
-}
-
-function hideBatchProgress() {
-  const bar = document.getElementById('batchProgressBar');
-  if (bar) bar.remove();
-}
-
+// ── CLIENTS ───────────────────────────────────────────────────────
 async function loadClients() {
-  try { state.clients = await fetch(`${API}/api/clients`).then(r => r.json()); renderClientList(); }
-  catch(e) { console.error(e); }
+  try {
+    state.allClients = await fetch(`${API}/api/clients`).then(r => r.json());
+    state.clients = [...state.allClients];
+    // Populate AE filter
+    const aes = [...new Set(state.allClients.map(c => c.assigned_ae).filter(Boolean))].sort();
+    const sel = document.getElementById('aeFilter');
+    sel.innerHTML = `<option value="">All AEs</option>` + aes.map(ae => `<option value="${ae}">${ae}</option>`).join('');
+    renderClientList();
+  } catch(e) { console.error(e); }
+}
+
+async function loadDashboardStats() {
+  try {
+    const stats = await fetch(`${API}/api/dashboard-stats`).then(r => r.json());
+    state.dashboardStats = stats;
+    if (state.activeView === 'dashboard') renderDashboard();
+    // Mark clients with recent activity
+    if (stats.recentActivity?.length) {
+      const activeClientIds = new Set(stats.recentActivity.map(a => a.client_id));
+      state.clientsWithActivity = activeClientIds;
+      renderClientList();
+    }
+  } catch(e) {}
 }
 
 function renderClientList() {
   const el = document.getElementById('clientList');
-  if (!state.clients.length) { el.innerHTML = `<div style="padding:12px 20px;font-size:12px;color:rgba(255,255,255,0.3);">No clients yet</div>`; return; }
-  el.innerHTML = state.clients.map(c => `<div class="client-item ${state.activeClient?.id===c.id?'active':''}" onclick="selectClient('${c.id}')"><span class="client-name">${c.name}</span>${c.vertical?`<span class="client-badge">${c.vertical.split('/')[0].trim()}</span>`:''}</div>`).join('');
+  if (!state.clients.length) { el.innerHTML = `<div style="padding:12px 20px;font-size:12px;color:rgba(255,255,255,0.3);">No clients</div>`; return; }
+  el.innerHTML = state.clients.map(c => {
+    const hasAlert = state.clientsWithActivity?.has(c.id);
+    return `<div class="client-item ${state.activeClient?.id===c.id?'active':''}" onclick="selectClient('${c.id}')">
+      <span class="client-name">${c.name}</span>
+      ${c.vertical?`<span class="client-badge">${c.vertical.split('/')[0].trim()}</span>`:''}
+      ${hasAlert?`<span class="client-alert" title="Recent client activity"></span>`:''}
+    </div>`;
+  }).join('');
 }
 
 function selectClient(id) {
-  state.activeClient = state.clients.find(c => c.id === id);
+  state.activeClient = state.allClients.find(c => c.id === id);
   state.activeView = 'client'; state.clientTab = 'titles';
   renderClientList(); renderView();
 }
@@ -315,35 +323,86 @@ function setView(view) {
   state.activeView = view; state.activeClient = null;
   document.querySelectorAll('.sidebar-item').forEach(el => el.classList.toggle('active', el.dataset.view === view));
   renderClientList(); renderView();
+  if (view === 'dashboard') loadDashboardStats();
 }
 
 function renderView() {
   const t = document.getElementById('topbarTitle'), s = document.getElementById('topbarSub'), a = document.getElementById('topbarActions');
   if (state.activeView === 'dashboard') { t.textContent='Dashboard'; s.textContent='MMW Blog Writing Engine'; a.innerHTML=''; renderDashboard(); }
-  else if (state.activeView === 'one-off') { t.textContent='One-Off Blog'; s.textContent='Write a blog outside the scheduled queue'; a.innerHTML=''; renderOneOff(); }
-  else if (state.activeView === 'client' && state.activeClient) { t.textContent=state.activeClient.name; s.textContent=state.activeClient.vertical||'Client'; a.innerHTML=`<button class="btn btn-secondary btn-sm" onclick="openClientModal('${state.activeClient.id}')">⚙️ Edit Client</button>`; renderClientView(); }
+  else if (state.activeView === 'one-off') { t.textContent='One-Off Blog'; s.textContent='Write a blog outside the queue'; a.innerHTML=''; renderOneOff(); }
+  else if (state.activeView === 'client' && state.activeClient) {
+    t.textContent=state.activeClient.name;
+    s.textContent=`${state.activeClient.vertical||'Client'}${state.activeClient.assigned_ae?' · '+state.activeClient.assigned_ae:''}`;
+    a.innerHTML=`<button class="btn btn-secondary btn-sm" onclick="openClientModal('${state.activeClient.id}')">⚙️ Edit</button>`;
+    renderClientView();
+  }
 }
 
+// ── DASHBOARD ─────────────────────────────────────────────────────
 function renderDashboard() {
+  const stats = state.dashboardStats || {};
+  const activity = stats.recentActivity || [];
   document.getElementById('mainContent').innerHTML = `
     <div class="stats-row">
-      <div class="stat-card"><div class="stat-value">${state.clients.length}</div><div class="stat-label">Total Clients</div></div>
-      <div class="stat-card"><div class="stat-value">–</div><div class="stat-label">Blogs Generated</div></div>
-      <div class="stat-card"><div class="stat-value">–</div><div class="stat-label">Pending Approval</div></div>
-      <div class="stat-card"><div class="stat-value">–</div><div class="stat-label">Published This Month</div></div>
+      <div class="stat-card">
+        <div class="stat-value">${stats.totalClients ?? state.clients.length}</div>
+        <div class="stat-label">Total Clients</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${stats.blogsLast30Days ?? '–'}</div>
+        <div class="stat-sub">last 30 days</div>
+        <div class="stat-label">Blogs Generated <span style="color:var(--muted);font-size:10px;">(${stats.totalBlogs ?? '–'} all time)</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${stats.pendingApproval ?? '–'}</div>
+        <div class="stat-label">Pending Approval</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${stats.blogsThisMonth ?? '–'}</div>
+        <div class="stat-label">Published This Month</div>
+      </div>
     </div>
-    <div class="card"><div class="card-title">Getting Started</div><p style="font-size:14px;line-height:1.7;color:var(--muted);">Select a client from the sidebar to manage their blog pipeline, or create a new client to get started. Each client has their own brand voice profile, sitemap reference, brand rules log, title queue, and blog history.</p></div>
-    ${state.clients.length?`<div class="card"><div class="card-title">All Clients</div><div class="table-wrap"><table><thead><tr><th>Client</th><th>Vertical</th><th>WordPress</th><th></th></tr></thead><tbody>${state.clients.map(c=>`<tr><td style="font-weight:500;">${c.name}</td><td>${c.vertical||'–'}</td><td>${c.wp_url?`<span style="color:var(--green);font-size:12px;">✓ Configured</span>`:`<span style="color:var(--muted);font-size:12px;">Not set</span>`}</td><td><button class="btn btn-secondary btn-sm" onclick="selectClient('${c.id}')">Open</button></td></tr>`).join('')}</tbody></table></div></div>`:''}
-  `;
+
+    ${activity.length ? `
+    <div class="card">
+      <div class="card-title">🔔 Recent Client Activity <span style="font-size:12px;color:var(--muted);font-weight:400;">Last 7 days</span></div>
+      <div>
+        ${activity.map(a => `
+          <div class="activity-item">
+            <div class="activity-dot ${a.client_approved?'approved':'suggestion'}"></div>
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:500;">${escapeHtml(a.clients?.name||'Unknown client')}</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:2px;">${escapeHtml(a.title)}</div>
+            </div>
+            <div style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;${a.client_approved?'background:var(--light-green);color:var(--green)':'background:#FFFBEB;color:#92400E'};">
+              ${a.client_approved ? '✓ Approved' : '💬 Suggestion'}
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>` : ''}
+
+    <div class="card">
+      <div class="card-title">All Clients</div>
+      <div class="table-wrap"><table><thead><tr><th>Client</th><th>Vertical</th><th>AE</th><th>WordPress</th><th></th></tr></thead><tbody>
+        ${state.allClients.map(c=>`<tr>
+          <td style="font-weight:500;">${c.name}</td>
+          <td>${c.vertical||'–'}</td>
+          <td style="color:var(--muted);font-size:12px;">${c.assigned_ae||'–'}</td>
+          <td>${c.wp_url?`<span style="color:var(--green);font-size:12px;">✓</span>`:`<span style="color:var(--muted);font-size:12px;">–</span>`}</td>
+          <td><button class="btn btn-secondary btn-sm" onclick="selectClient('${c.id}')">Open</button></td>
+        </tr>`).join('')}
+      </tbody></table></div>
+    </div>`;
 }
 
+// ── ONE-OFF ────────────────────────────────────────────────────────
 function renderOneOff() {
-  if (!state.clients.length) { document.getElementById('mainContent').innerHTML=`<div class="card"><div class="empty-state"><div class="icon">👤</div><div class="title">No clients yet</div><div class="desc">Create a client first.</div></div></div>`; return; }
+  if (!state.allClients.length) { document.getElementById('mainContent').innerHTML=`<div class="card"><div class="empty-state"><div class="icon">👤</div><div class="title">No clients yet</div></div></div>`; return; }
   document.getElementById('mainContent').innerHTML = `
     <div class="card" style="max-width:680px;">
       <div class="card-title">Write a One-Off Blog</div>
-      <div class="form-group"><label class="form-label">Client *</label><select class="form-select" id="oneOffClient"><option value="">Select a client...</option>${state.clients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></div>
-      <div class="form-group"><label class="form-label">Blog Topic / Title *</label><input class="form-input" id="oneOffTitle" placeholder="e.g. What to Expect at Your First Hormone Consultation" /><p class="form-hint">Can be descriptive — the AI will refine it into a compelling headline</p></div>
+      <div class="form-group"><label class="form-label">Client *</label><select class="form-select" id="oneOffClient"><option value="">Select...</option>${state.allClients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></div>
+      <div class="form-group"><label class="form-label">Blog Topic / Title *</label><input class="form-input" id="oneOffTitle" placeholder="e.g. What to Expect at Your First Hormone Consultation" /><p class="form-hint">Can be descriptive — AI will refine the headline</p></div>
       <div class="form-group"><label class="form-label">Target Keyword (optional)</label><input class="form-input" id="oneOffKeyword" placeholder="e.g. hormone therapy consultation" /></div>
       <button class="btn btn-primary" onclick="generateOneOff()" id="oneOffBtn">✍️ Generate Blog</button>
     </div>
@@ -356,22 +415,24 @@ async function generateOneOff() {
   const keyword = document.getElementById('oneOffKeyword').value.trim();
   if (!clientId || !title) { alert('Please select a client and enter a topic'); return; }
   const btn = document.getElementById('oneOffBtn'), result = document.getElementById('oneOffResult');
-  btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Generating...`;
-  result.innerHTML = `<div class="card"><div class="generation-progress"><div class="spinner spinner-dark" style="width:28px;height:28px;margin:0 auto;border-width:3px;"></div><p>Writing your blog — this takes about 30–60 seconds...</p></div></div>`;
+  btn.disabled=true; btn.innerHTML=`<span class="spinner"></span> Generating...`;
+  result.innerHTML=`<div class="card"><div class="generation-progress"><div class="spinner spinner-dark" style="width:28px;height:28px;margin:0 auto;border-width:3px;"></div><p>Writing your blog — this takes about 30–60 seconds...</p></div></div>`;
   try {
-    const data = await fetch(`${API}/api/generate-blog`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({clientId,title,targetKeyword:keyword,isOneOff:true}) }).then(r=>r.json());
+    const res = await fetch(`${API}/api/generate-blog`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId,title,targetKeyword:keyword,isOneOff:true})});
+    const data = await res.json();
     if (data.error) throw new Error(data.error);
-    result.innerHTML = '';
-    openBlogView(data.blog);
-  } catch(e) { result.innerHTML = `<div class="alert alert-error">❌ ${e.message}</div>`; }
-  btn.disabled = false; btn.innerHTML = '✍️ Generate Blog';
+    result.innerHTML=''; openBlogView(data.blog);
+  } catch(e) { result.innerHTML=`<div class="alert alert-error">❌ ${e.message}</div>`; }
+  btn.disabled=false; btn.innerHTML='✍️ Generate Blog';
 }
 
+// ── CLIENT VIEW ────────────────────────────────────────────────────
 async function renderClientView() {
-  document.getElementById('mainContent').innerHTML = `
+  document.getElementById('mainContent').innerHTML=`
     <div class="tabs">
       <div class="tab ${state.clientTab==='titles'?'active':''}" onclick="setClientTab('titles')">📋 Title Queue</div>
       <div class="tab ${state.clientTab==='blogs'?'active':''}" onclick="setClientTab('blogs')">📄 Blog Queue</div>
+      <div class="tab ${state.clientTab==='clusters'?'active':''}" onclick="setClientTab('clusters')">🔗 Clusters</div>
       <div class="tab ${state.clientTab==='profile'?'active':''}" onclick="setClientTab('profile')">🏢 Profile & Settings</div>
     </div>
     <div id="clientTabContent"></div>`;
@@ -379,37 +440,37 @@ async function renderClientView() {
 }
 
 function setClientTab(tab) {
-  state.clientTab = tab;
-  document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.textContent.includes({titles:'Title',blogs:'Blog',profile:'Profile'}[tab])));
+  state.clientTab=tab;
+  document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('active',el.textContent.includes({titles:'Title',blogs:'Blog',clusters:'Cluster',profile:'Profile'}[tab])));
   renderClientTab();
 }
 
 function renderClientTab() {
   if (state.clientTab==='titles') renderTitlesTab();
   else if (state.clientTab==='blogs') renderBlogsTab();
+  else if (state.clientTab==='clusters') renderClustersTab();
   else if (state.clientTab==='profile') renderProfileTab();
 }
 
-// ── TITLES ────────────────────────────────────────────────────────
+// ── TITLES TAB ─────────────────────────────────────────────────────
 async function renderTitlesTab() {
-  const el = document.getElementById('clientTabContent');
-  el.innerHTML = `<div style="text-align:center;padding:40px;"><div class="spinner spinner-dark" style="margin:0 auto;width:28px;height:28px;border-width:3px;"></div></div>`;
-  const titles = await fetch(`${API}/api/clients/${state.activeClient.id}/titles`).then(r=>r.json());
-  const proposed = titles.filter(t=>t.status==='proposed');
-  const approved = titles.filter(t=>t.status==='approved');
-  const others = titles.filter(t=>!['proposed','approved'].includes(t.status));
-
-  el.innerHTML = `
+  const el=document.getElementById('clientTabContent');
+  el.innerHTML=`<div style="text-align:center;padding:40px;"><div class="spinner spinner-dark" style="margin:0 auto;width:28px;height:28px;border-width:3px;"></div></div>`;
+  const titles=await fetch(`${API}/api/clients/${state.activeClient.id}/titles`).then(r=>r.json());
+  const proposed=titles.filter(t=>t.status==='proposed');
+  const approved=titles.filter(t=>t.status==='approved');
+  const others=titles.filter(t=>!['proposed','approved'].includes(t.status));
+  el.innerHTML=`
     <div class="card">
       <div class="card-title">Generate New Titles</div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Number of Titles</label><select class="form-select" id="titleCount"><option value="6">6</option><option value="12" selected>12 (recommended)</option><option value="24">24</option><option value="50">50</option></select></div>
-        <div class="form-group"><label class="form-label">Topic Direction (optional)</label><input class="form-input" id="topicDirection" placeholder="e.g. Focus on weight loss and hormones this quarter" /></div>
+        <div class="form-group"><label class="form-label">Topic Direction (optional)</label><input class="form-input" id="topicDirection" placeholder="e.g. Focus on weight loss and hormones" /></div>
       </div>
       <div class="form-group"><label class="form-label">Override Target Keywords (optional)</label><input class="form-input" id="titleKeywords" placeholder="Leave blank to use client profile keywords" /></div>
       <button class="btn btn-primary" onclick="generateTitles()" id="generateTitlesBtn">🎯 Generate Titles</button>
     </div>
-    ${proposed.length ? `
+    ${proposed.length?`
     <div class="card">
       <div class="card-title">Proposed Titles
         <div style="display:flex;gap:8px;align-items:center;">
@@ -418,458 +479,609 @@ async function renderTitlesTab() {
         </div>
       </div>
       ${proposed.map(t=>renderTitleCard(t)).join('')}
-    </div>` : ''}
-    ${approved.length ? `<div class="card">
-      <div class="card-title">
-        Approved — Ready to Write
+    </div>`:''}
+    ${approved.length?`
+    <div class="card">
+      <div class="card-title">Approved — Ready to Write
         <div style="display:flex;gap:8px;align-items:center;">
           <span style="font-size:12px;color:var(--green);font-weight:400;">${approved.length} approved</span>
           <button class="btn btn-primary btn-sm" onclick="startBatchGenerate(${JSON.stringify(approved.map(t=>t.id))})">⚡ Generate All (${approved.length})</button>
         </div>
       </div>
       ${approved.map(t=>renderTitleCard(t)).join('')}
-    </div>` : ''}
-    ${others.length ? `<div class="card"><div class="card-title">In Progress / Completed</div>${others.map(t=>renderTitleCard(t)).join('')}</div>` : ''}
-    ${!titles.length ? `<div class="card"><div class="empty-state"><div class="icon">🎯</div><div class="title">No titles yet</div><div class="desc">Generate your first batch of blog titles above.</div></div></div>` : ''}
+    </div>`:''}
+    ${others.length?`<div class="card"><div class="card-title">In Progress / Completed</div>${others.map(t=>renderTitleCard(t)).join('')}</div>`:''}
+    ${!titles.length?`<div class="card"><div class="empty-state"><div class="icon">🎯</div><div class="title">No titles yet</div><div class="desc">Generate your first batch above or create a topic cluster.</div></div></div>`:''}
   `;
 }
 
 function renderTitleCard(t) {
-  const needsReviewFlag = t.needs_review ? `<span style="display:inline-flex;align-items:center;gap:4px;background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;">⚠️ Client Suggestion</span>` : '';
-  const approvedFlag = t.client_approved ? `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--light-green);color:var(--green);font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;">✓ Client Approved</span>` : '';
-  const suggestionBlock = t.client_suggestion ? `<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;padding:8px 12px;margin-top:8px;font-size:12px;line-height:1.5;"><strong style="color:#92400E;">Client note:</strong> ${escapeHtml(t.client_suggestion)}</div>` : '';
+  const needsReviewFlag=t.needs_review?`<span style="display:inline-flex;align-items:center;gap:4px;background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;">⚠️ Client Suggestion</span>`:'';
+  const approvedFlag=t.client_approved?`<span style="display:inline-flex;align-items:center;gap:4px;background:var(--light-green);color:var(--green);font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;">✓ Client Approved</span>`:'';
+  const clusterBadge=t.cluster_id?`<span style="display:inline-flex;align-items:center;gap:4px;background:#EFF6FF;color:var(--blue);font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;">🔗 Cluster ${t.cluster_position||''}</span>`:'';
+  const suggestionBlock=t.client_suggestion?`<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;padding:8px 12px;margin-top:8px;font-size:12px;line-height:1.5;"><strong style="color:#92400E;">Client note:</strong> ${escapeHtml(t.client_suggestion)}</div>`:'';
+  const rewriteBtn=t.needs_review&&t.client_suggestion?`<button class="btn btn-warning btn-sm" onclick="openRewriteModal('${t.id}',\`${escapeJs(t.title)}\`,\`${escapeJs(t.client_suggestion)}\`)">✨ AI Rewrite</button>`:'';
   return `<div class="title-card" id="titleCard_${t.id}">
     <div style="flex:1;">
-      ${t.schedule_slot ? `<div style="font-size:11px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">${escapeHtml(t.schedule_slot)}</div>` : ''}
+      ${t.schedule_slot?`<div style="font-size:11px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">${escapeHtml(t.schedule_slot)}</div>`:''}
       <div style="font-size:14px;font-weight:500;line-height:1.4;">${escapeHtml(t.title)}</div>
       ${t.target_keyword?`<div style="font-size:12px;color:var(--muted);margin-top:3px;">🔑 ${escapeHtml(t.target_keyword)}</div>`:''}
       ${t.rationale?`<div style="font-size:12px;color:var(--muted);margin-top:4px;font-style:italic;line-height:1.4;">${escapeHtml(t.rationale)}</div>`:''}
       ${suggestionBlock}
-      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">${approvedFlag}${needsReviewFlag}</div>
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">${approvedFlag}${needsReviewFlag}${clusterBadge}</div>
     </div>
     <div class="title-actions">
       <span class="badge badge-${t.status}">${formatStatus(t.status)}</span>
       ${t.status==='proposed'?`<button class="btn btn-secondary btn-sm" onclick="updateTitleStatus('${t.id}','approved')">✓ Approve</button><button class="btn btn-secondary btn-sm" onclick="editTitle('${t.id}')">✏️</button><button class="btn btn-danger btn-sm" onclick="updateTitleStatus('${t.id}','rejected')">✕</button>`:''}
-      ${t.status==='approved'?`<button class="btn btn-primary btn-sm" onclick="openGenerateModal('${t.id}',\`${escapeJs(t.title)}\`,\`${escapeJs(t.target_keyword||'')}\`,\`${escapeJs(t.scheduled_date||'')}\`)">✍️ Write</button>`:''}
+      ${rewriteBtn}
+      ${t.status==='approved'?`<button class="btn btn-primary btn-sm" onclick="openGenerateModal('${t.id}',\`${escapeJs(t.title)}\`,\`${escapeJs(t.target_keyword||'')}\`)">✍️ Write</button>`:''}
       ${t.status==='rejected'?`<button class="btn btn-secondary btn-sm" onclick="updateTitleStatus('${t.id}','proposed')">↩ Restore</button>`:''}
     </div>
   </div>`;
 }
 
 async function generateTitles() {
-  const btn = document.getElementById('generateTitlesBtn');
-  btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Generating...`;
+  const btn=document.getElementById('generateTitlesBtn');
+  btn.disabled=true; btn.innerHTML=`<span class="spinner"></span> Generating...`;
   try {
-    const data = await fetch(`${API}/api/clients/${state.activeClient.id}/generate-titles`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ count: document.getElementById('titleCount').value, topicDirection: document.getElementById('topicDirection').value.trim(), targetKeywords: document.getElementById('titleKeywords').value.trim() }) }).then(r=>r.json());
+    const data=await fetch(`${API}/api/clients/${state.activeClient.id}/generate-titles`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({count:document.getElementById('titleCount').value,topicDirection:document.getElementById('topicDirection').value.trim(),targetKeywords:document.getElementById('titleKeywords').value.trim()})}).then(r=>r.json());
     if (data.error) throw new Error(data.error);
     renderTitlesTab();
-  } catch(e) { alert(`Failed to generate titles: ${e.message}`); }
-  btn.disabled = false; btn.innerHTML = '🎯 Generate Titles';
+  } catch(e) { alert(`Failed: ${e.message}`); }
+  btn.disabled=false; btn.innerHTML='🎯 Generate Titles';
 }
 
 async function shareWithClient() {
-  const btn = event.target;
-  const origText = btn.textContent;
-  btn.disabled = true; btn.textContent = 'Copying...';
+  const btn=event.target; const orig=btn.textContent;
+  btn.disabled=true; btn.textContent='Copying...';
   try {
-    const data = await fetch(`${API}/api/clients/${state.activeClient.id}/share-titles`, { method:'POST' }).then(r=>r.json());
+    const data=await fetch(`${API}/api/clients/${state.activeClient.id}/share-titles`,{method:'POST'}).then(r=>r.json());
     if (data.error) throw new Error(data.error);
     await navigator.clipboard.writeText(data.shareUrl);
     showToast(`✅ Link copied! (${data.count} titles)`);
   } catch(e) { alert(`Error: ${e.message}`); }
-  btn.disabled = false; btn.textContent = origText;
+  btn.disabled=false; btn.textContent=orig;
 }
 
-async function updateTitleStatus(titleId, status) {
-  await fetch(`${API}/api/titles/${titleId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status}) });
+async function updateTitleStatus(titleId,status) {
+  await fetch(`${API}/api/titles/${titleId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
   renderTitlesTab();
 }
 
+async function openRewriteModal(titleId,originalTitle,clientNote) {
+  const body=document.getElementById('rewriteModalBody');
+  body.innerHTML=`
+    <div style="margin-bottom:16px;"><div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;">Original Title</div><div style="font-size:14px;font-weight:500;">${escapeHtml(originalTitle)}</div></div>
+    <div class="alert alert-warning"><strong>Client note:</strong> ${escapeHtml(clientNote)}</div>
+    <div class="generation-progress" id="rewriteLoading"><div class="spinner spinner-dark" style="width:24px;height:24px;margin:0 auto;border-width:3px;"></div><p>Generating 3 alternatives...</p></div>
+    <div id="rewriteAlternatives"></div>`;
+  document.getElementById('rewriteModal').style.display='flex';
+  try {
+    const data=await fetch(`${API}/api/titles/${titleId}/rewrite`,{method:'POST'}).then(r=>r.json());
+    if (data.error) throw new Error(data.error);
+    document.getElementById('rewriteLoading').style.display='none';
+    document.getElementById('rewriteAlternatives').innerHTML=`
+      <div style="font-size:13px;color:var(--muted);margin-bottom:14px;">Pick the option that best addresses the client's feedback.</div>
+      ${(data.alternatives||[]).map((a,i)=>`
+        <div style="border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:10px;background:var(--white);">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+            <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px;">Option ${i+1}</div>
+              <div style="font-size:15px;font-weight:600;line-height:1.4;margin-bottom:4px;">${escapeHtml(a.title)}</div>
+              <div style="font-size:12px;color:var(--muted);margin-bottom:5px;">🔑 ${escapeHtml(a.targetKeyword||'')}</div>
+              <div style="font-size:12px;color:var(--muted);font-style:italic;line-height:1.4;">${escapeHtml(a.rationale||'')}</div>
+            </div>
+            <button class="btn btn-primary btn-sm" style="flex-shrink:0;margin-top:4px;" onclick="acceptRewrite('${titleId}',\`${escapeJs(a.title)}\`,\`${escapeJs(a.targetKeyword||'')}\`,this)">Use This</button>
+          </div>
+        </div>`).join('')}
+      <div style="display:flex;justify-content:flex-end;margin-top:8px;"><button class="btn btn-secondary" onclick="closeModal('rewriteModal')">Cancel</button></div>`;
+  } catch(e) { document.getElementById('rewriteLoading').style.display='none'; document.getElementById('rewriteAlternatives').innerHTML=`<div class="alert alert-error">❌ ${e.message}</div>`; }
+}
+
+async function acceptRewrite(titleId,title,targetKeyword,btn) {
+  btn.disabled=true; btn.textContent='Saving...';
+  try {
+    await fetch(`${API}/api/titles/${titleId}/accept-rewrite`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,targetKeyword})});
+    closeModal('rewriteModal'); showToast('✅ Title updated'); renderTitlesTab();
+  } catch(e) { btn.disabled=false; btn.textContent='Use This'; alert(`Failed: ${e.message}`); }
+}
+
 function editTitle(titleId) {
-  const card = document.getElementById(`titleCard_${titleId}`);
-  const titleDiv = card.querySelector('div[style*="font-weight:500"]');
-  const kwDiv = card.querySelector('div[style*="color:var(--muted)"]');
-  const current = titleDiv.textContent;
-  const currentKw = kwDiv ? kwDiv.textContent.replace('🔑 ', '') : '';
-  titleDiv.innerHTML = `<input class="form-input" id="editTitleInput_${titleId}" value="${escapeHtml(current)}" style="margin-bottom:6px;" />`;
-  if (kwDiv) kwDiv.innerHTML = `<input class="form-input" id="editKwInput_${titleId}" value="${escapeHtml(currentKw)}" placeholder="Target keyword" style="font-size:12px;" />`;
-  card.querySelector('.title-actions').innerHTML = `<button class="btn btn-primary btn-sm" onclick="saveEditTitle('${titleId}')">Save</button><button class="btn btn-secondary btn-sm" onclick="renderTitlesTab()">Cancel</button>`;
+  const card=document.getElementById(`titleCard_${titleId}`);
+  const titleDiv=card.querySelector('div[style*="font-weight:500"]');
+  const kwDiv=card.querySelector('div[style*="color:var(--muted);margin-top:3px"]');
+  const current=titleDiv.textContent, currentKw=kwDiv?kwDiv.textContent.replace('🔑 ',''):'';
+  titleDiv.innerHTML=`<input class="form-input" id="editTitleInput_${titleId}" value="${escapeHtml(current)}" style="margin-bottom:6px;" />`;
+  if (kwDiv) kwDiv.innerHTML=`<input class="form-input" id="editKwInput_${titleId}" value="${escapeHtml(currentKw)}" placeholder="Target keyword" style="font-size:12px;" />`;
+  card.querySelector('.title-actions').innerHTML=`<button class="btn btn-primary btn-sm" onclick="saveEditTitle('${titleId}')">Save</button><button class="btn btn-secondary btn-sm" onclick="renderTitlesTab()">Cancel</button>`;
 }
 
 async function saveEditTitle(titleId) {
-  const title = document.getElementById(`editTitleInput_${titleId}`)?.value.trim();
-  const keyword = document.getElementById(`editKwInput_${titleId}`)?.value.trim();
-  await fetch(`${API}/api/titles/${titleId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({title, target_keyword:keyword, status:'proposed'}) });
+  const title=document.getElementById(`editTitleInput_${titleId}`)?.value.trim();
+  const keyword=document.getElementById(`editKwInput_${titleId}`)?.value.trim();
+  await fetch(`${API}/api/titles/${titleId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,target_keyword:keyword,status:'proposed'})});
   renderTitlesTab();
 }
 
 // ── GENERATE BLOG MODAL ────────────────────────────────────────────
-function openGenerateModal(titleId, title, keyword, scheduledDate) {
-  document.getElementById('generateModalTitle').textContent = 'Generate Blog';
-  document.getElementById('generateModalBody').innerHTML = `
-    <div class="alert alert-info">✍️ Writing a blog for: <strong>${escapeHtml(title)}</strong></div>
+function openGenerateModal(titleId,title,keyword) {
+  document.getElementById('generateModalTitle').textContent='Generate Blog';
+  document.getElementById('generateModalBody').innerHTML=`
+    <div class="alert alert-info">✍️ Writing: <strong>${escapeHtml(title)}</strong></div>
     <div class="form-group"><label class="form-label">Blog Title</label><input class="form-input" id="genTitle" value="${escapeHtml(title)}" /></div>
     <div class="form-group"><label class="form-label">Target Keyword</label><input class="form-input" id="genKeyword" value="${escapeHtml(keyword)}" placeholder="e.g. hormone therapy consultation" /></div>
-    ${scheduledDate ? `<div class="form-group"><label class="form-label">Scheduled Publish Date</label><input class="form-input" type="date" id="genScheduledDate" value="${escapeHtml(scheduledDate)}" /><p class="form-hint">Pre-filled from the blog schedule — can be adjusted</p></div>` : ''}
     <div id="genResult"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-secondary" onclick="closeModal('generateModal')">Cancel</button>
       <button class="btn btn-primary" onclick="runGenerate('${titleId}')" id="runGenBtn">✍️ Generate</button>
     </div>`;
-  document.getElementById('generateModal').style.display = 'flex';
+  document.getElementById('generateModal').style.display='flex';
 }
 
 async function runGenerate(titleId) {
-  const title = document.getElementById('genTitle').value.trim();
-  const keyword = document.getElementById('genKeyword').value.trim();
-  const btn = document.getElementById('runGenBtn'), result = document.getElementById('genResult');
-  btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Writing...`;
-  result.innerHTML = `<div class="generation-progress"><div class="spinner spinner-dark" style="width:28px;height:28px;margin:0 auto;border-width:3px;"></div><p>Writing your blog — this takes about 30–60 seconds...</p></div>`;
+  const title=document.getElementById('genTitle').value.trim();
+  const keyword=document.getElementById('genKeyword').value.trim();
+  const btn=document.getElementById('runGenBtn'),result=document.getElementById('genResult');
+  btn.disabled=true; btn.innerHTML=`<span class="spinner"></span> Writing...`;
+  result.innerHTML=`<div class="generation-progress"><div class="spinner spinner-dark" style="width:28px;height:28px;margin:0 auto;border-width:3px;"></div><p>Writing your blog — this takes about 30–60 seconds...</p></div>`;
   try {
-    const res = await fetch(`${API}/api/generate-blog`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clientId: state.activeClient.id, titleId, title, targetKeyword: keyword, isOneOff: false })
-    });
-    const data = await res.json();
+    const res=await fetch(`${API}/api/generate-blog`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId:state.activeClient.id,titleId,title,targetKeyword:keyword,isOneOff:false})});
+    const data=await res.json();
     if (data.error) throw new Error(data.error);
-    if (!data.blog) throw new Error('No blog returned from server');
-    result.innerHTML = `<div class="alert alert-success">✅ Blog generated successfully!</div>`;
-    btn.textContent = 'View Blog';
-    btn.disabled = false;
-    btn.onclick = () => { closeModal('generateModal'); openBlogView(data.blog); };
-    // Refresh blogs tab in background
-    if (state.clientTab === 'blogs') renderBlogsTab();
+    if (!data.blog) throw new Error('No blog returned');
+    result.innerHTML=`<div class="alert alert-success">✅ Blog generated!</div>`;
+    btn.textContent='View Blog'; btn.disabled=false;
+    btn.onclick=()=>{closeModal('generateModal');openBlogView(data.blog);};
+    if (state.clientTab==='blogs') renderBlogsTab();
   } catch(e) {
-    console.error('Generate error:', e);
-    result.innerHTML = `<div class="alert alert-error">❌ ${e.message}</div>`;
-    btn.disabled = false;
-    btn.innerHTML = '✍️ Try Again';
-    btn.onclick = () => runGenerate(titleId);
+    result.innerHTML=`<div class="alert alert-error">❌ ${e.message}</div>`;
+    btn.disabled=false; btn.innerHTML='✍️ Try Again'; btn.onclick=()=>runGenerate(titleId);
   }
 }
 
 // ── BLOGS TAB ──────────────────────────────────────────────────────
 async function renderBlogsTab() {
   if (state.clientTab!=='blogs') return;
-  const el = document.getElementById('clientTabContent');
-  el.innerHTML = `<div style="text-align:center;padding:40px;"><div class="spinner spinner-dark" style="margin:0 auto;width:28px;height:28px;border-width:3px;"></div></div>`;
-  const blogs = await fetch(`${API}/api/clients/${state.activeClient.id}/blogs`).then(r=>r.json());
-  const groups = { draft: blogs.filter(b=>b.status==='draft'), 'in-review': blogs.filter(b=>b.status==='in-review'), approved: blogs.filter(b=>b.status==='approved'), published: blogs.filter(b=>b.status==='published') };
-  const statusIcon = { draft:'📝', 'in-review':'👀', approved:'✅', published:'🚀' };
-
-  el.innerHTML = !blogs.length ? `<div class="card"><div class="empty-state"><div class="icon">📄</div><div class="title">No blogs yet</div><div class="desc">Approve titles then click Write to generate blogs.</div></div></div>`
-    : Object.entries(groups).filter(([,b])=>b.length).map(([status,items])=>`
+  const el=document.getElementById('clientTabContent');
+  el.innerHTML=`<div style="text-align:center;padding:40px;"><div class="spinner spinner-dark" style="margin:0 auto;width:28px;height:28px;border-width:3px;"></div></div>`;
+  const blogs=await fetch(`${API}/api/clients/${state.activeClient.id}/blogs`).then(r=>r.json());
+  if (blogs.error) { el.innerHTML=`<div class="alert alert-error">❌ ${blogs.error}</div>`; return; }
+  const groups={draft:blogs.filter(b=>b.status==='draft'),'in-review':blogs.filter(b=>b.status==='in-review'),approved:blogs.filter(b=>b.status==='approved'),published:blogs.filter(b=>b.status==='published')};
+  const sIcon={draft:'📝','in-review':'👀',approved:'✅',published:'🚀'};
+  el.innerHTML=!blogs.length?`<div class="card"><div class="empty-state"><div class="icon">📄</div><div class="title">No blogs yet</div><div class="desc">Approve titles then click Write to generate blogs.</div></div></div>`
+    :Object.entries(groups).filter(([,b])=>b.length).map(([status,items])=>`
     <div class="card">
-      <div class="card-title">${statusIcon[status]} ${formatStatus(status)} <span style="font-size:12px;color:var(--muted);font-weight:400;">${items.length} blog${items.length!==1?'s':''}</span></div>
-      <div class="table-wrap"><table><thead><tr><th>Title</th><th>Keyword</th><th>Type</th><th>Created</th><th>Actions</th></tr></thead><tbody>
+      <div class="card-title">${sIcon[status]} ${formatStatus(status)} <span style="font-size:12px;color:var(--muted);font-weight:400;">${items.length} blog${items.length!==1?'s':''}</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Title</th><th>Keyword</th><th>Words</th><th>Type</th><th>Created</th><th>Actions</th></tr></thead><tbody>
         ${items.map(b=>`<tr>
-          <td style="font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(b.title)}">${escapeHtml(b.title)}</td>
+          <td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(b.title)}">${escapeHtml(b.title)}</td>
           <td style="font-size:12px;color:var(--muted);">${b.target_keyword||'–'}</td>
+          <td style="font-size:12px;color:var(--muted);">${b.word_count?b.word_count.toLocaleString():'–'}</td>
           <td><span style="font-size:11px;color:${b.is_one_off?'var(--muted)':'var(--green)'};">${b.is_one_off?'One-Off':'From Queue'}</span></td>
           <td style="font-size:12px;color:var(--muted);">${formatDate(b.created_at)}</td>
           <td><div style="display:flex;gap:6px;flex-wrap:wrap;">
             <button class="btn btn-secondary btn-sm" onclick="viewBlog('${b.id}')">View</button>
-            <button class="btn btn-secondary btn-sm" onclick="exportBlog('${b.id}')">⬇️ .docx</button>
-            ${status==='draft'?`<button class="btn btn-secondary btn-sm" onclick="moveBlogStatus('${b.id}','in-review',this)">→ In Review</button>`:''}
+            <button class="btn btn-secondary btn-sm" onclick="exportBlog('${b.id}')">⬇️</button>
+            ${status==='draft'?`<button class="btn btn-secondary btn-sm" onclick="moveBlogStatus('${b.id}','in-review',this)">→ Review</button>`:''}
             ${status==='in-review'?`<button class="btn btn-primary btn-sm" onclick="moveBlogStatus('${b.id}','approved',this)">✓ Approve</button>`:''}
-            ${status==='approved'?`<button class="btn btn-primary btn-sm" onclick="openWpPushModal('${b.id}','${b.scheduled_date||''}')">🚀 Push to WP</button>`:''}
+            ${status==='approved'?`<button class="btn btn-primary btn-sm" onclick="openWpPushModal('${b.id}')">🚀 Push to WP</button>`:''}
             ${status==='published'?`<button class="btn btn-secondary btn-sm" onclick="publishWpPost('${b.id}',this)">🌐 Publish Live</button>${b.wp_post_id&&state.activeClient?.wp_url?`<a href="${state.activeClient.wp_url}/wp-admin/post.php?post=${b.wp_post_id}&action=edit" target="_blank" class="btn btn-secondary btn-sm">WP ↗</a>`:''}`:''}
+            <button class="btn btn-secondary btn-sm" onclick="shareBlog('${b.id}')">🔗</button>
           </div></td>
         </tr>`).join('')}
       </tbody></table></div>
     </div>`).join('');
 }
 
-async function viewBlog(blogId) {
-  const blog = await fetch(`${API}/api/blogs/${blogId}`).then(r=>r.json());
-  openBlogView(blog);
-}
+async function viewBlog(blogId) { const blog=await fetch(`${API}/api/blogs/${blogId}`).then(r=>r.json()); openBlogView(blog); }
 
 function openBlogView(blog) {
-  document.getElementById('blogViewTitle').textContent = blog.title;
-  let html = `<div class="blog-preview">${renderBlogHtml(blog.content)}</div>`;
-
-  if (blog.faq_json && blog.faq_json.length) {
-    html += `<div class="meta-box"><div class="meta-box-title">FAQ Preview</div><div class="faq-preview">${blog.faq_json.map(f=>`<div class="faq-item"><div class="faq-q">${escapeHtml(f.question)}</div><div class="faq-a">${escapeHtml(f.answer)}</div></div>`).join('')}</div></div>`;
-  }
-
-  if (blog.title_tag || blog.meta_description) {
-    html += `<div class="meta-box"><div class="meta-box-title">SEO Metadata</div>
+  document.getElementById('blogViewTitle').textContent=blog.title;
+  let html=`<div class="blog-preview">${renderBlogHtml(blog.content)}</div>`;
+  if (blog.faq_json?.length) html+=`<div class="meta-box"><div class="meta-box-title">FAQ Preview</div><div class="faq-preview">${blog.faq_json.map(f=>`<div class="faq-item"><div class="faq-q">${escapeHtml(f.question)}</div><div class="faq-a">${escapeHtml(f.answer)}</div></div>`).join('')}</div></div>`;
+  if (blog.title_tag||blog.meta_description) {
+    html+=`<div class="meta-box"><div class="meta-box-title">SEO Metadata</div>
       ${blog.title_tag?`<div class="meta-field"><span class="meta-field-label">Title Tag</span><span class="meta-field-value">${escapeHtml(blog.title_tag)}</span></div>`:''}
       ${blog.meta_description?`<div class="meta-field"><span class="meta-field-label">Meta Description</span><span class="meta-field-value">${escapeHtml(blog.meta_description)}</span></div>`:''}
       ${blog.slug?`<div class="meta-field"><span class="meta-field-label">Slug</span><span class="meta-field-value">/${escapeHtml(blog.slug)}</span></div>`:''}
       ${blog.target_keyword?`<div class="meta-field"><span class="meta-field-label">Target Keyword</span><span class="meta-field-value">${escapeHtml(blog.target_keyword)}</span></div>`:''}
+      ${blog.word_count?`<div class="meta-field"><span class="meta-field-label">Word Count</span><span class="meta-field-value">${blog.word_count.toLocaleString()} words</span></div>`:''}
       ${blog.internal_links_used?`<div class="meta-field"><span class="meta-field-label">Internal Links</span><span class="meta-field-value">${escapeHtml(blog.internal_links_used)}</span></div>`:''}
     </div>`;
   }
-
-  if (blog.schema_json) {
-    html += `<div class="schema-box"><div class="schema-box-header"><span class="schema-box-label">JSON-LD Schema</span><button class="btn btn-secondary btn-sm" onclick="copySchema()" style="font-size:11px;">Copy</button></div><pre id="schemaContent">${escapeHtml(blog.schema_json)}</pre></div>`;
-  }
-
-  document.getElementById('blogViewBody').innerHTML = html;
-  document.getElementById('blogViewFooter').innerHTML = `
+  if (blog.schema_json) html+=`<div class="schema-box"><div class="schema-box-header"><span class="schema-box-label">JSON-LD Schema</span><button class="btn btn-secondary btn-sm" onclick="copySchema()" style="font-size:11px;">Copy</button></div><pre id="schemaContent">${escapeHtml(blog.schema_json)}</pre></div>`;
+  document.getElementById('blogViewBody').innerHTML=html;
+  document.getElementById('blogViewFooter').innerHTML=`
     <span class="badge badge-${blog.status}" style="margin-right:auto;">${formatStatus(blog.status)}</span>
-    <button class="btn btn-secondary" onclick="exportBlog('${blog.id}')">⬇️ Download .docx</button>
+    <button class="btn btn-secondary" onclick="shareBlog('${blog.id}')">🔗 Share Preview</button>
+    <button class="btn btn-secondary" onclick="exportBlog('${blog.id}')">⬇️ .docx</button>
     <button class="btn btn-secondary" onclick="closeModal('blogViewModal')">Close</button>`;
-  document.getElementById('blogViewModal').style.display = 'flex';
+  document.getElementById('blogViewModal').style.display='flex';
 }
 
-function copySchema() {
-  const text = document.getElementById('schemaContent')?.textContent;
-  if (text) { navigator.clipboard.writeText(text); showToast('Schema copied to clipboard'); }
-}
+function copySchema() { const t=document.getElementById('schemaContent')?.textContent; if(t){navigator.clipboard.writeText(t);showToast('Schema copied');} }
 
 function renderBlogHtml(markdown) {
   if (!markdown) return '';
-  const lines = markdown.split('\n');
-  let html = '', inUl = false;
+  const lines=markdown.split('\n'); let html='',inUl=false;
   for (const line of lines) {
-    const t = line.trim();
-    const isBullet = t.startsWith('- ') || t.startsWith('* ');
-    if (!isBullet && inUl) { html += '</ul>'; inUl = false; }
-    if (!t) { html += '<br/>'; continue; }
-    if (t.startsWith('# ')) html += `<h1>${escapeHtml(t.slice(2))}</h1>`;
-    else if (t.startsWith('## ')) html += `<h2>${escapeHtml(t.slice(3))}</h2>`;
-    else if (t.startsWith('### ')) html += `<h3>${escapeHtml(t.slice(4))}</h3>`;
-    else if (isBullet) { if (!inUl) { html += '<ul>'; inUl = true; } html += `<li>${escapeHtml(t.slice(2))}</li>`; }
-    else if (t.startsWith('[Image:')) html += `<div class="image-marker">${escapeHtml(t)}</div>`;
-    else html += `<p>${escapeHtml(t).replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')}</p>`;
+    const t=line.trim(), isBullet=t.startsWith('- ')||t.startsWith('* ');
+    if (!isBullet&&inUl){html+='</ul>';inUl=false;}
+    if (!t){html+='<br/>';continue;}
+    if (t.startsWith('# ')) html+=`<h1>${escapeHtml(t.slice(2))}</h1>`;
+    else if (t.startsWith('## ')) html+=`<h2>${escapeHtml(t.slice(3))}</h2>`;
+    else if (t.startsWith('### ')) html+=`<h3>${escapeHtml(t.slice(4))}</h3>`;
+    else if (isBullet){if(!inUl){html+='<ul>';inUl=true;}html+=`<li>${escapeHtml(t.slice(2))}</li>`;}
+    else if (t.startsWith('[Image:')) html+=`<div class="image-marker">${escapeHtml(t)}</div>`;
+    else html+=`<p>${escapeHtml(t).replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')}</p>`;
   }
-  if (inUl) html += '</ul>';
+  if (inUl) html+='</ul>';
   return html;
 }
 
-async function moveBlogStatus(blogId, status, btn) {
-  btn.disabled = true;
-  await fetch(`${API}/api/blogs/${blogId}/status`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status}) });
-  renderBlogsTab();
+async function moveBlogStatus(blogId,status,btn) { btn.disabled=true; await fetch(`${API}/api/blogs/${blogId}/status`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})}); renderBlogsTab(); }
+function exportBlog(blogId) { window.open(`${API}/api/blogs/${blogId}/export`,'_blank'); }
+
+async function shareBlog(blogId) {
+  try {
+    const data=await fetch(`${API}/api/blogs/${blogId}/share`,{method:'POST'}).then(r=>r.json());
+    await navigator.clipboard.writeText(data.shareUrl);
+    showToast('✅ Preview link copied!');
+  } catch(e) { alert(`Error: ${e.message}`); }
 }
 
-function exportBlog(blogId) { window.open(`${API}/api/blogs/${blogId}/export`, '_blank'); }
+// ── WP PUSH MODAL ─────────────────────────────────────────────────
+async function openWpPushModal(blogId) {
+  state.wpPushBlogId=blogId; state.selectedWpCategories=[];
+  document.getElementById('wpFeaturedImage').value='';
+  document.getElementById('wpPublishDate').value='';
+  document.getElementById('wpPushResult').innerHTML='';
+  document.getElementById('wpPushBtn').disabled=false;
+  document.getElementById('wpPushBtn').textContent='🚀 Push to WordPress';
+  // Load categories
+  const picker=document.getElementById('wpCategoryPicker');
+  picker.innerHTML=`<div style="font-size:12px;color:var(--muted);">Loading categories...</div>`;
+  document.getElementById('wpPushModal').style.display='flex';
+  try {
+    // Try cached first
+    const profile=await fetch(`${API}/api/clients/${state.activeClient.id}/profile`).then(r=>r.json());
+    state.wpCategories=profile?.wp_categories||[];
+    if (!state.wpCategories.length) {
+      const cats=await fetch(`${API}/api/clients/${state.activeClient.id}/wp-categories`).then(r=>r.json());
+      state.wpCategories=Array.isArray(cats)?cats:[];
+    }
+    renderCategoryPicker();
+  } catch { picker.innerHTML=`<div style="font-size:12px;color:var(--muted);">Categories unavailable — check WP connection</div>`; }
+}
 
-function openWpPushModal(blogId, scheduledDate) {
-  state.wpPushBlogId = blogId;
-  document.getElementById('wpFeaturedImage').value = '';
-  document.getElementById('wpPublishDate').value = scheduledDate || '';
-  document.getElementById('wpPushResult').innerHTML = '';
-  document.getElementById('wpPushBtn').disabled = false;
-  document.getElementById('wpPushBtn').textContent = '🚀 Push to WordPress';
-  document.getElementById('wpPushModal').style.display = 'flex';
+function renderCategoryPicker() {
+  const picker=document.getElementById('wpCategoryPicker');
+  const selected=state.selectedWpCategories;
+  picker.innerHTML=`
+    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">
+      ${selected.map(id=>{const cat=state.wpCategories.find(c=>c.id===id);return cat?`<span class="cat-chip">${escapeHtml(cat.name)}<button onclick="toggleCategory(${id})">×</button></span>`:''}).join('')}
+    </div>
+    <select class="form-select" onchange="if(this.value){toggleCategory(parseInt(this.value));this.value=''}" style="margin-bottom:8px;">
+      <option value="">Add category...</option>
+      ${state.wpCategories.filter(c=>!selected.includes(c.id)).map(c=>`<option value="${c.id}">${escapeHtml(c.name)} (${c.count})</option>`).join('')}
+    </select>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input class="form-input" id="newCatInput" placeholder="New category name" style="font-size:13px;" />
+      <button class="btn btn-secondary btn-sm" onclick="createWpCategory()" style="white-space:nowrap;">+ Create</button>
+      <button class="btn btn-secondary btn-sm" onclick="refreshCategories()" title="Refresh from WordPress">↻</button>
+    </div>`;
+}
+
+function toggleCategory(id) {
+  const idx=state.selectedWpCategories.indexOf(id);
+  if (idx>=0) state.selectedWpCategories.splice(idx,1); else state.selectedWpCategories.push(id);
+  renderCategoryPicker();
+}
+
+async function createWpCategory() {
+  const name=document.getElementById('newCatInput').value.trim();
+  if (!name) return;
+  try {
+    const cat=await fetch(`${API}/api/clients/${state.activeClient.id}/wp-categories`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})}).then(r=>r.json());
+    if (cat.error) throw new Error(cat.error);
+    state.wpCategories.push({id:cat.id,name:cat.name,slug:cat.slug,count:0});
+    state.selectedWpCategories.push(cat.id);
+    renderCategoryPicker();
+    showToast(`✅ Category "${name}" created`);
+  } catch(e) { alert(`Failed: ${e.message}`); }
+}
+
+async function refreshCategories() {
+  try {
+    const cats=await fetch(`${API}/api/clients/${state.activeClient.id}/wp-categories`).then(r=>r.json());
+    state.wpCategories=Array.isArray(cats)?cats:[];
+    renderCategoryPicker(); showToast('Categories refreshed');
+  } catch(e) { alert(`Failed: ${e.message}`); }
 }
 
 async function executePushToWp() {
-  const btn = document.getElementById('wpPushBtn'), result = document.getElementById('wpPushResult');
-  const imageFile = document.getElementById('wpFeaturedImage').files[0];
-  const publishDate = document.getElementById('wpPublishDate').value;
-  btn.disabled = true;
-  const isScheduled = publishDate && new Date(publishDate) > new Date();
-  btn.innerHTML = `<span class="spinner"></span> Pushing...`;
-
-  const formData = new FormData();
-  if (imageFile) formData.append('featuredImage', imageFile);
-  if (publishDate) formData.append('publishDate', publishDate);
-
+  const btn=document.getElementById('wpPushBtn'),result=document.getElementById('wpPushResult');
+  const imageFile=document.getElementById('wpFeaturedImage').files[0];
+  const publishDate=document.getElementById('wpPublishDate').value;
+  btn.disabled=true; btn.innerHTML=`<span class="spinner"></span> Pushing...`;
+  const formData=new FormData();
+  if (imageFile) formData.append('featuredImage',imageFile);
+  if (publishDate) formData.append('publishDate',publishDate);
+  if (state.selectedWpCategories.length) formData.append('categoryIds',JSON.stringify(state.selectedWpCategories));
   try {
-    const res = await fetch(`${API}/api/blogs/${state.wpPushBlogId}/push-to-wp`, { method:'POST', body: formData });
-    const data = await res.json();
+    const res=await fetch(`${API}/api/blogs/${state.wpPushBlogId}/push-to-wp`,{method:'POST',body:formData});
+    const data=await res.json();
     if (data.error) throw new Error(data.error);
-    const statusMsg = isScheduled ? `Scheduled for ${new Date(publishDate).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}` : 'Saved as draft';
-    result.innerHTML = `<div class="alert alert-success">✅ ${statusMsg}!${data.wpEditUrl?` <a href="${data.wpEditUrl}" target="_blank" style="color:inherit;font-weight:700;">Edit in WP ↗</a>`:''}</div>`;
-    btn.textContent = 'Done';
-    renderBlogsTab();
-  } catch(e) { result.innerHTML=`<div class="alert alert-error">❌ ${e.message}</div>`; btn.disabled=false; btn.textContent='🚀 Push to WordPress'; }
+    const isScheduled=publishDate&&new Date(publishDate)>new Date();
+    const msg=isScheduled?`Scheduled for ${new Date(publishDate).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}`:'Saved as draft';
+    result.innerHTML=`<div class="alert alert-success">✅ ${msg}!${data.wpEditUrl?` <a href="${data.wpEditUrl}" target="_blank" style="color:inherit;font-weight:700;">Edit in WP ↗</a>`:''}</div>`;
+    btn.textContent='Done'; renderBlogsTab();
+  } catch(e) { result.innerHTML=`<div class="alert alert-error">❌ ${e.message}</div>`;btn.disabled=false;btn.textContent='🚀 Push to WordPress'; }
 }
 
-async function publishWpPost(blogId, btn) {
+async function publishWpPost(blogId,btn) {
   if (!confirm('Publish this post live on WordPress?')) return;
-  btn.disabled = true; btn.textContent = 'Publishing...';
+  btn.disabled=true; btn.textContent='Publishing...';
   try {
-    const data = await fetch(`${API}/api/blogs/${blogId}/publish-wp`, { method:'POST' }).then(r=>r.json());
+    const data=await fetch(`${API}/api/blogs/${blogId}/publish-wp`,{method:'POST'}).then(r=>r.json());
     if (data.error) throw new Error(data.error);
-    showToast('Published live on WordPress!');
-    if (data.url) window.open(data.url, '_blank');
+    showToast('Published live!');
+    if (data.url) window.open(data.url,'_blank');
     renderBlogsTab();
-  } catch(e) { alert(`❌ ${e.message}`); btn.disabled=false; btn.textContent='🌐 Publish Live'; }
+  } catch(e) { alert(`❌ ${e.message}`);btn.disabled=false;btn.textContent='🌐 Publish Live'; }
+}
+
+// ── CLUSTERS TAB ───────────────────────────────────────────────────
+async function renderClustersTab() {
+  const el=document.getElementById('clientTabContent');
+  el.innerHTML=`<div style="text-align:center;padding:40px;"><div class="spinner spinner-dark" style="margin:0 auto;width:28px;height:28px;border-width:3px;"></div></div>`;
+  const clusters=await fetch(`${API}/api/clients/${state.activeClient.id}/clusters`).then(r=>r.json());
+  el.innerHTML=`
+    <div class="card">
+      <div class="card-title">Generate Topic Cluster</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6;">A topic cluster creates one authoritative pillar page brief plus several supporting blog titles that all interlink — a powerful SEO structure for healthcare content.</p>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Pillar Topic *</label><input class="form-input" id="clusterTopic" placeholder="e.g. Hormone Therapy for Women" /></div>
+        <div class="form-group"><label class="form-label">Supporting Blog Count</label><select class="form-select" id="clusterCount"><option value="3">3 blogs</option><option value="5" selected>5 blogs (recommended)</option><option value="7">7 blogs</option></select></div>
+      </div>
+      <button class="btn btn-primary" onclick="generateCluster()" id="generateClusterBtn">🔗 Generate Cluster</button>
+    </div>
+    ${clusters.length?clusters.map(c=>{
+      let pillar={};try{pillar=JSON.parse(c.pillar_brief||'{}')}catch{}
+      const titles=c.blog_titles||[];
+      return `<div class="cluster-card">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+          <div style="flex:1;">
+            <div class="cluster-pillar">🗂 ${escapeHtml(c.pillar_topic)}</div>
+            ${c.pillar_keyword?`<div class="cluster-kw">Pillar keyword: ${escapeHtml(c.pillar_keyword)}</div>`:''}
+            ${pillar.recommendedTitle?`<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Recommended title: <em>${escapeHtml(pillar.recommendedTitle)}</em></div>`:''}
+            ${pillar.recommendedWordCount?`<div style="font-size:12px;color:var(--muted);">Recommended pillar word count: ${pillar.recommendedWordCount.toLocaleString()}</div>`:''}
+            ${pillar.sections?.length?`<div style="margin-top:8px;"><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Pillar Sections</div>${pillar.sections.map(s=>`<div style="font-size:12px;color:var(--muted);">• ${escapeHtml(s)}</div>`).join('')}</div>`:''}
+          </div>
+          <span style="font-size:11px;color:var(--muted);white-space:nowrap;">${formatDate(c.created_at)}</span>
+        </div>
+        ${titles.length?`<div class="cluster-titles"><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Supporting Blogs</div>${titles.map(t=>`<div class="cluster-title-item"><span class="badge badge-${t.status}" style="font-size:10px;">${formatStatus(t.status)}</span> ${escapeHtml(t.title)}${t.schedule_slot?` <span style="color:var(--green);font-size:10px;">(${escapeHtml(t.schedule_slot)})</span>`:''}</div>`).join('')}</div>`:''}
+      </div>`;
+    }).join(''):`<div class="card"><div class="empty-state"><div class="icon">🔗</div><div class="title">No clusters yet</div><div class="desc">Generate your first topic cluster above to build a structured content strategy.</div></div></div>`}
+  `;
+}
+
+async function generateCluster() {
+  const topic=document.getElementById('clusterTopic').value.trim();
+  const count=document.getElementById('clusterCount').value;
+  if (!topic){alert('Please enter a pillar topic');return;}
+  const btn=document.getElementById('generateClusterBtn');
+  btn.disabled=true; btn.innerHTML=`<span class="spinner"></span> Generating cluster...`;
+  try {
+    const data=await fetch(`${API}/api/clients/${state.activeClient.id}/generate-cluster`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pillarTopic:topic,supportingCount:parseInt(count)})}).then(r=>r.json());
+    if (data.error) throw new Error(data.error);
+    showToast(`✅ Cluster created — ${data.supportingTitles?.length||0} titles added to queue`);
+    renderClustersTab();
+  } catch(e){alert(`Failed: ${e.message}`);}
+  btn.disabled=false; btn.innerHTML='🔗 Generate Cluster';
 }
 
 // ── PROFILE & SETTINGS TAB ─────────────────────────────────────────
 async function renderProfileTab() {
-  const el = document.getElementById('clientTabContent');
-  el.innerHTML = `<div style="text-align:center;padding:40px;"><div class="spinner spinner-dark" style="margin:0 auto;width:28px;height:28px;border-width:3px;"></div></div>`;
-  const [profile, rules] = await Promise.all([
+  const el=document.getElementById('clientTabContent');
+  el.innerHTML=`<div style="text-align:center;padding:40px;"><div class="spinner spinner-dark" style="margin:0 auto;width:28px;height:28px;border-width:3px;"></div></div>`;
+  const [profile,rules]=await Promise.all([
     fetch(`${API}/api/clients/${state.activeClient.id}/profile`).then(r=>r.json()),
     fetch(`${API}/api/clients/${state.activeClient.id}/rules`).then(r=>r.json())
   ]);
 
-  el.innerHTML = `
+  el.innerHTML=`
     <div class="card" style="max-width:800px;">
       <div class="card-title">Brand Voice & Profile</div>
-      <div class="form-group"><label class="form-label">Master Record / Brand Voice</label><textarea class="form-textarea" id="profileVoice" rows="10" placeholder="Paste the client's master record or brand voice document here. This is injected into every blog generation prompt.">${escapeHtml(profile?.brand_voice||'')}</textarea></div>
+      <div class="form-group"><label class="form-label">Master Record / Brand Voice</label><textarea class="form-textarea" id="profileVoice" rows="10" placeholder="Paste the client's master record or brand voice document here.">${escapeHtml(profile?.brand_voice||'')}</textarea></div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Target Keywords</label><textarea class="form-textarea" id="profileKeywords" rows="4" placeholder="List target keywords, one per line or comma-separated.">${escapeHtml(profile?.target_keywords||'')}</textarea></div>
-        <div class="form-group"><label class="form-label">Location / Service Area</label><input class="form-input" id="profileLocation" value="${escapeHtml(profile?.location||'')}" placeholder="e.g. Austin, TX or Greater Phoenix Area" /><p class="form-hint">Used for local SEO in both title generation and blog writing. Leave blank if not relevant.</p></div>
+        <div class="form-group"><label class="form-label">Target Keywords</label><textarea class="form-textarea" id="profileKeywords" rows="4" placeholder="One per line or comma-separated.">${escapeHtml(profile?.target_keywords||'')}</textarea></div>
+        <div class="form-group">
+          <div class="form-group"><label class="form-label">Primary Location</label><input class="form-input" id="profileLocation" value="${escapeHtml(profile?.location||'')}" placeholder="e.g. Austin, TX" /></div>
+          <div class="form-group"><label class="form-label">Service Areas</label><input class="form-input" id="profileServiceAreas" value="${escapeHtml(profile?.service_areas||'')}" placeholder="e.g. Round Rock, Cedar Park, Georgetown" /><p class="form-hint">Comma-separated. Used for local SEO across titles and blogs.</p></div>
+        </div>
       </div>
       <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
     </div>
 
     <div class="card" style="max-width:800px;">
       <div class="card-title">Blog Schedule</div>
-      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6;">These settings control how blog titles are assigned to calendar slots when generated. Titles will be spaced evenly across months starting from the schedule start date. The start date can be set in advance for new site builds that aren't live yet.</p>
       <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Blogs Per Month</label>
-          <input class="form-input" type="number" id="profileBlogsPerMonth" min="1" max="12" value="${profile?.blogs_per_month||2}" />
-          <p class="form-hint">Smart Start / Practice Pro = 2 &nbsp;|&nbsp; Whiz Works = 3 &nbsp;|&nbsp; Custom as needed</p>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Schedule Start Date</label>
-          <input class="form-input" type="date" id="profileStartDate" value="${profile?.schedule_start_date||''}" />
-          <p class="form-hint">First blog publish date. Set ahead of time for upcoming site launches.</p>
-        </div>
+        <div class="form-group"><label class="form-label">Blogs Per Month</label><input class="form-input" type="number" id="profileBlogsPerMonth" min="1" max="12" value="${profile?.blogs_per_month||2}" /><p class="form-hint">Smart Start / Practice Pro = 2 &nbsp;|&nbsp; Whiz Works = 3</p></div>
+        <div class="form-group"><label class="form-label">Schedule Start Date</label><input class="form-input" type="date" id="profileStartDate" value="${profile?.schedule_start_date||''}" /><p class="form-hint">First publish date. Can be set ahead for new site launches.</p></div>
       </div>
       <button class="btn btn-primary" onclick="saveSchedule()">Save Schedule</button>
     </div>
 
     <div class="card" style="max-width:800px;">
-      <div class="card-title">
-        Brand Rules
-        <span style="font-size:12px;color:var(--muted);font-weight:400;">${rules.length} rule${rules.length!==1?'s':''} active</span>
-      </div>
-      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6;">Brand rules are injected into every blog generation for this client. Use them to log client corrections, tone preferences, or anything that should always apply.</p>
-      <div class="form-group"><textarea class="form-textarea" id="newRule" rows="2" placeholder='e.g. Never use the word "journey". Always refer to the provider as Dr. Smith.'></textarea></div>
+      <div class="card-title">Brand Rules <span style="font-size:12px;color:var(--muted);font-weight:400;">${rules.length} active</span></div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6;">Injected into every blog for this client. Log corrections, preferences, and anything that should always apply.</p>
+      <div class="form-group"><textarea class="form-textarea" id="newRule" rows="2" placeholder='e.g. Never use the word "journey". Refer to the provider as Dr. Smith.'></textarea></div>
       <button class="btn btn-secondary" onclick="addRule()" style="margin-bottom:20px;">+ Add Rule</button>
-      ${rules.length ? `<div class="rules-list">${rules.map(r=>`<div class="rule-item"><div class="rule-text">${escapeHtml(r.rule)}</div><div style="display:flex;align-items:center;gap:8px;flex-shrink:0;"><span style="font-size:11px;color:var(--muted);">${formatDate(r.created_at)}</span><button class="btn btn-danger btn-sm" onclick="deleteRule('${r.id}')">Remove</button></div></div>`).join('')}</div>`
-      : `<div class="empty-state" style="padding:20px;"><div class="icon" style="font-size:24px;">📏</div><div class="title" style="font-size:13px;">No rules yet</div></div>`}
+      ${rules.length?`<div class="rules-list">${rules.map(r=>`<div class="rule-item"><div class="rule-text">${escapeHtml(r.rule)}</div><div style="display:flex;align-items:center;gap:8px;flex-shrink:0;"><span style="font-size:11px;color:var(--muted);">${formatDate(r.created_at)}</span><button class="btn btn-danger btn-sm" onclick="deleteRule('${r.id}')">Remove</button></div></div>`).join('')}</div>`
+      :`<div class="empty-state" style="padding:20px;"><div class="icon" style="font-size:24px;">📏</div><div class="title" style="font-size:13px;">No rules yet</div></div>`}
     </div>
 
     <div class="card" style="max-width:800px;">
-      <div class="card-title">
-        Sitemap
-        ${profile?.sitemap_pages?.length?`<span style="font-size:12px;color:var(--green);font-weight:400;">✓ ${profile.sitemap_pages.length} pages loaded</span>`:''}
-      </div>
-      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6;">Upload the client's XML sitemap or a plain text file with one URL per line. Used to prevent keyword cannibalization and suggest internal links.</p>
-      <div class="form-group"><label class="form-label">Upload Sitemap File</label><input type="file" id="sitemapFile" accept=".xml,.txt" /></div>
+      <div class="card-title">Sitemap & Keyword Tracking ${profile?.sitemap_pages?.length?`<span style="font-size:12px;color:var(--green);font-weight:400;">✓ ${profile.sitemap_pages.length} pages</span>`:''}</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6;">Upload the client's XML sitemap or a plain text file with one URL per line. Optionally add target keywords per page to prevent cannibalization in title generation.</p>
+      <div class="form-group"><label class="form-label">Upload Sitemap</label><input type="file" id="sitemapFile" accept=".xml,.txt" /></div>
       <button class="btn btn-secondary" onclick="uploadSitemap()">Upload Sitemap</button>
       <div id="sitemapResult" style="margin-top:12px;"></div>
-      ${profile?.sitemap_pages?.length ? `<div style="margin-top:16px;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;"><table><thead><tr><th>Page</th><th>URL</th></tr></thead><tbody>${profile.sitemap_pages.slice(0,50).map(p=>`<tr><td style="font-size:12px;">${escapeHtml(p.title)}</td><td style="font-size:11px;color:var(--muted);">${escapeHtml(p.url)}</td></tr>`).join('')}${profile.sitemap_pages.length>50?`<tr><td colspan="2" style="font-size:12px;color:var(--muted);text-align:center;">...and ${profile.sitemap_pages.length-50} more</td></tr>`:''}</tbody></table></div>` : ''}
+      ${profile?.sitemap_pages?.length?`
+      <div style="margin-top:16px;max-height:240px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">
+        <table><thead><tr><th>Page</th><th>Target Keyword</th><th>URL</th></tr></thead><tbody>
+          ${profile.sitemap_pages.slice(0,50).map((p,i)=>`<tr>
+            <td style="font-size:12px;">${escapeHtml(p.title)}</td>
+            <td><input style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;width:140px;" placeholder="Add keyword" value="${escapeHtml(p.targetKeyword||'')}" onblur="updateSitemapKeyword(${i},this.value)" /></td>
+            <td style="font-size:11px;color:var(--muted);">${escapeHtml(p.url)}</td>
+          </tr>`).join('')}
+          ${profile.sitemap_pages.length>50?`<tr><td colspan="3" style="font-size:12px;color:var(--muted);text-align:center;">...and ${profile.sitemap_pages.length-50} more</td></tr>`:''}
+        </tbody></table>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="saveSitemapKeywords()" style="margin-top:8px;">Save Keywords</button>`:''}
     </div>
 
     <div class="card" style="max-width:800px;">
       <div class="card-title">WordPress Connection</div>
       <button class="btn btn-secondary" onclick="testWpConnection()" id="testWpBtn">Test Connection</button>
       <div id="wpTestResult" style="margin-top:12px;"></div>
-    </div>
-  `;
+    </div>`;
+
+  // Store sitemap pages for keyword editing
+  state.sitemapPages = profile?.sitemap_pages || [];
+}
+
+let _sitemapKeywordTimer = null;
+function updateSitemapKeyword(index, keyword) {
+  if (!state.sitemapPages) return;
+  state.sitemapPages[index] = { ...state.sitemapPages[index], targetKeyword: keyword };
+}
+
+async function saveSitemapKeywords() {
+  await fetch(`${API}/api/clients/${state.activeClient.id}/profile`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sitemap_pages:state.sitemapPages})});
+  showToast('Keywords saved');
 }
 
 async function saveProfile() {
-  await fetch(`${API}/api/clients/${state.activeClient.id}/profile`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ brand_voice: document.getElementById('profileVoice').value, target_keywords: document.getElementById('profileKeywords').value, location: document.getElementById('profileLocation').value.trim() }) });
+  await fetch(`${API}/api/clients/${state.activeClient.id}/profile`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({brand_voice:document.getElementById('profileVoice').value,target_keywords:document.getElementById('profileKeywords').value,location:document.getElementById('profileLocation').value.trim(),service_areas:document.getElementById('profileServiceAreas').value.trim()})});
   showToast('Profile saved');
 }
 
 async function saveSchedule() {
-  await fetch(`${API}/api/clients/${state.activeClient.id}/profile`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ blogs_per_month: document.getElementById('profileBlogsPerMonth').value, schedule_start_date: document.getElementById('profileStartDate').value || null }) });
+  await fetch(`${API}/api/clients/${state.activeClient.id}/profile`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({blogs_per_month:document.getElementById('profileBlogsPerMonth').value,schedule_start_date:document.getElementById('profileStartDate').value||null})});
   showToast('Schedule saved');
 }
 
 async function addRule() {
-  const rule = document.getElementById('newRule').value.trim();
+  const rule=document.getElementById('newRule').value.trim();
   if (!rule) return;
-  await fetch(`${API}/api/clients/${state.activeClient.id}/rules`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({rule}) });
+  await fetch(`${API}/api/clients/${state.activeClient.id}/rules`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rule})});
   renderProfileTab();
 }
 
 async function deleteRule(ruleId) {
-  if (!confirm('Remove this brand rule?')) return;
-  await fetch(`${API}/api/clients/${state.activeClient.id}/rules/${ruleId}`, { method:'DELETE' });
+  if (!confirm('Remove this rule?')) return;
+  await fetch(`${API}/api/clients/${state.activeClient.id}/rules/${ruleId}`,{method:'DELETE'});
   renderProfileTab();
 }
 
 async function uploadSitemap() {
-  const file = document.getElementById('sitemapFile').files[0];
-  if (!file) { alert('Please select a file first'); return; }
-  const result = document.getElementById('sitemapResult');
-  result.innerHTML = `<div class="alert alert-info">Processing sitemap...</div>`;
-  const form = new FormData(); form.append('sitemap', file);
-  const data = await fetch(`${API}/api/clients/${state.activeClient.id}/sitemap`, { method:'POST', body:form }).then(r=>r.json());
-  if (data.error) { result.innerHTML=`<div class="alert alert-error">❌ ${data.error}</div>`; }
-  else { result.innerHTML=`<div class="alert alert-success">✅ ${data.count} pages imported</div>`; setTimeout(()=>renderProfileTab(), 1200); }
+  const file=document.getElementById('sitemapFile').files[0];
+  if (!file){alert('Please select a file');return;}
+  const result=document.getElementById('sitemapResult');
+  result.innerHTML=`<div class="alert alert-info">Processing...</div>`;
+  const form=new FormData(); form.append('sitemap',file);
+  const data=await fetch(`${API}/api/clients/${state.activeClient.id}/sitemap`,{method:'POST',body:form}).then(r=>r.json());
+  if (data.error){result.innerHTML=`<div class="alert alert-error">❌ ${data.error}</div>`;}
+  else{result.innerHTML=`<div class="alert alert-success">✅ ${data.count} pages imported</div>`;setTimeout(()=>renderProfileTab(),1200);}
 }
 
 async function testWpConnection() {
-  const btn = document.getElementById('testWpBtn'), result = document.getElementById('wpTestResult');
-  btn.disabled = true; btn.textContent = 'Testing...';
-  const data = await fetch(`${API}/api/clients/${state.activeClient.id}/test-wp`, { method:'POST' }).then(r=>r.json());
-  result.innerHTML = data.success ? `<div class="alert alert-success">✅ ${data.message}</div>` : `<div class="alert alert-error">❌ ${data.message}</div>`;
-  btn.disabled = false; btn.textContent = 'Test Connection';
+  const btn=document.getElementById('testWpBtn'),result=document.getElementById('wpTestResult');
+  btn.disabled=true; btn.textContent='Testing...';
+  const data=await fetch(`${API}/api/clients/${state.activeClient.id}/test-wp`,{method:'POST'}).then(r=>r.json());
+  result.innerHTML=data.success?`<div class="alert alert-success">✅ ${data.message}</div>`:`<div class="alert alert-error">❌ ${data.message}</div>`;
+  btn.disabled=false; btn.textContent='Test Connection';
 }
 
 // ── CLIENT MODAL ───────────────────────────────────────────────────
-function openClientModal(clientId = null) {
-  state.editingClientId = clientId;
+function openClientModal(clientId=null) {
+  state.editingClientId=clientId;
   if (clientId) {
-    const c = state.clients.find(x => x.id === clientId);
-    document.getElementById('clientModalTitle').textContent = 'Edit Client';
-    document.getElementById('clientName').value = c.name||'';
-    document.getElementById('clientVertical').value = c.vertical||'';
-    document.getElementById('clientWpUrl').value = c.wp_url||'';
-    document.getElementById('clientWpUser').value = c.wp_username||'';
-    document.getElementById('clientWpPass').value = '';
+    const c=state.allClients.find(x=>x.id===clientId);
+    document.getElementById('clientModalTitle').textContent='Edit Client';
+    document.getElementById('clientName').value=c.name||'';
+    document.getElementById('clientVertical').value=c.vertical||'';
+    document.getElementById('clientAE').value=c.assigned_ae||'';
+    document.getElementById('clientWpUrl').value=c.wp_url||'';
+    document.getElementById('clientWpUser').value=c.wp_username||'';
+    document.getElementById('clientWpPass').value='';
   } else {
-    document.getElementById('clientModalTitle').textContent = 'New Client';
-    ['clientName','clientWpUrl','clientWpUser','clientWpPass'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('clientVertical').value = '';
+    document.getElementById('clientModalTitle').textContent='New Client';
+    ['clientName','clientWpUrl','clientWpUser','clientWpPass','clientAE'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('clientVertical').value='';
   }
-  document.getElementById('clientModal').style.display = 'flex';
+  document.getElementById('clientModal').style.display='flex';
 }
 
 async function saveClient() {
-  const btn = document.getElementById('saveClientBtn');
-  const payload = { name: document.getElementById('clientName').value.trim(), vertical: document.getElementById('clientVertical').value, wp_url: document.getElementById('clientWpUrl').value.trim(), wp_username: document.getElementById('clientWpUser').value.trim() };
-  const pass = document.getElementById('clientWpPass').value.trim();
-  if (pass) payload.wp_app_password = pass;
-  if (!payload.name) { alert('Client name is required'); return; }
-  btn.disabled = true;
+  const btn=document.getElementById('saveClientBtn');
+  const payload={name:document.getElementById('clientName').value.trim(),vertical:document.getElementById('clientVertical').value,wp_url:document.getElementById('clientWpUrl').value.trim(),wp_username:document.getElementById('clientWpUser').value.trim(),assigned_ae:document.getElementById('clientAE').value.trim()};
+  const pass=document.getElementById('clientWpPass').value.trim();
+  if (pass) payload.wp_app_password=pass;
+  if (!payload.name){alert('Client name is required');return;}
+  btn.disabled=true;
   try {
-    const url = state.editingClientId ? `${API}/api/clients/${state.editingClientId}` : `${API}/api/clients`;
-    const saved = await fetch(url, { method: state.editingClientId?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) }).then(r=>r.json());
+    const url=state.editingClientId?`${API}/api/clients/${state.editingClientId}`:`${API}/api/clients`;
+    const saved=await fetch(url,{method:state.editingClientId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(r=>r.json());
     closeModal('clientModal'); await loadClients();
     if (!state.editingClientId) selectClient(saved.id);
-  } catch { alert('Failed to save client'); }
-  btn.disabled = false;
+  } catch{alert('Failed to save client');}
+  btn.disabled=false;
 }
+
+// ── BATCH GENERATION ──────────────────────────────────────────────
+async function startBatchGenerate(titleIds) {
+  if (!titleIds?.length) return;
+  if (!confirm(`Generate ${titleIds.length} blog${titleIds.length>1?'s':''} in the background?`)) return;
+  try {
+    const data=await fetch(`${API}/api/clients/${state.activeClient.id}/batch-generate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({titleIds})}).then(r=>r.json());
+    if (data.error) throw new Error(data.error);
+    state.batchJobId=data.jobId;
+    showBatchProgress(0,data.total,0);
+    state.batchPollInterval=setInterval(()=>pollBatchJob(),8000);
+  } catch(e){alert(`Failed: ${e.message}`);}
+}
+
+async function pollBatchJob() {
+  if (!state.batchJobId){clearInterval(state.batchPollInterval);return;}
+  try {
+    const job=await fetch(`${API}/api/batch-status/${state.batchJobId}`).then(r=>r.json());
+    if (job.error){clearInterval(state.batchPollInterval);hideBatchProgress();return;}
+    showBatchProgress(job.completed,job.total,job.failed);
+    if (job.status==='done') {
+      clearInterval(state.batchPollInterval); state.batchJobId=null;
+      setTimeout(()=>{hideBatchProgress();showToast(`✅ ${job.completed} blog${job.completed!==1?'s':''} generated!${job.failed?` (${job.failed} failed)`:''}`);if(state.clientTab==='blogs')renderBlogsTab();if(state.clientTab==='titles')renderTitlesTab();},1500);
+    }
+  } catch(e){console.error(e);}
+}
+
+function showBatchProgress(completed,total,failed) {
+  let bar=document.getElementById('batchProgressBar');
+  if (!bar){bar=document.createElement('div');bar.id='batchProgressBar';bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:200;background:var(--dark);color:white;padding:10px 24px;display:flex;align-items:center;gap:16px;font-family:var(--font-ui);font-size:13px;box-shadow:0 2px 12px rgba(0,0,0,0.3);';document.body.appendChild(bar);}
+  const pct=total>0?Math.round((completed/total)*100):0;
+  bar.innerHTML=`<span style="color:var(--green);">⚡</span><span>Generating blogs in background...</span><div style="flex:1;background:rgba(255,255,255,0.15);border-radius:10px;height:6px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:var(--green);border-radius:10px;transition:width 0.5s;"></div></div><span style="white-space:nowrap;">${completed}/${total}${failed?` <span style="color:#FCA5A5;">(${failed} failed)</span>`:''}</span>`;
+}
+
+function hideBatchProgress(){const b=document.getElementById('batchProgressBar');if(b)b.remove();}
 
 // ── UTILS ──────────────────────────────────────────────────────────
-function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-
-function formatStatus(s) {
-  return {proposed:'Proposed',approved:'Approved',rejected:'Rejected',in_progress:'In Progress',draft:'Draft','in-review':'In Review',published:'Published'}[s] || s;
-}
-
-function formatDate(iso) {
-  if (!iso) return '–';
-  return new Date(iso).toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
-}
-
-function escapeHtml(s) {
-  if (!s) return '';
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function escapeJs(s) {
-  if (!s) return '';
-  return String(s).replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/\$/g,'\\$');
-}
-
-function showToast(msg) {
-  const t = document.createElement('div');
-  t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:var(--dark);color:white;padding:10px 18px;border-radius:8px;font-size:13px;z-index:9999;font-family:var(--font-ui);box-shadow:0 4px 20px rgba(0,0,0,0.2);';
-  t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2800);
-}
+function closeModal(id){document.getElementById(id).style.display='none';}
+function formatStatus(s){return{proposed:'Proposed',approved:'Approved',rejected:'Rejected',in_progress:'In Progress',draft:'Draft','in-review':'In Review',published:'Published'}[s]||s;}
+function formatDate(iso){if(!iso)return'–';return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function escapeHtml(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function escapeJs(s){if(!s)return'';return String(s).replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/\$/g,'\\$');}
+function showToast(msg){const t=document.createElement('div');t.style.cssText='position:fixed;bottom:24px;right:24px;background:var(--dark);color:white;padding:10px 18px;border-radius:8px;font-size:13px;z-index:9999;font-family:var(--font-ui);box-shadow:0 4px 20px rgba(0,0,0,0.2);';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2800);}
 
 init();
 </script>
