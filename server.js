@@ -47,7 +47,10 @@ app.post('/api/clients', async (req, res) => {
 
 app.put('/api/clients/:id', async (req, res) => {
   const { name, vertical, wp_url, wp_username, wp_app_password, assigned_ae } = req.body;
-  const { data, error } = await supabase.from('clients').update({ name, vertical, wp_url, wp_username, wp_app_password, assigned_ae }).eq('id', req.params.id).select().single();
+  const updates = { name, vertical, wp_url, wp_username, assigned_ae };
+  // Only overwrite the password if a new one was actually provided
+  if (wp_app_password && wp_app_password.trim()) updates.wp_app_password = wp_app_password;
+  const { data, error } = await supabase.from('clients').update(updates).eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
