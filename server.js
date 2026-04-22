@@ -500,9 +500,19 @@ app.get('/api/dashboard-stats', async (req, res) => {
     supabase.from('blogs').select('id', { count: 'exact', head: true }).eq('status', 'published').gte('created_at', startOfMonth),
     supabase.from('blogs').select('id', { count: 'exact', head: true }).gte('created_at', thirtyDaysAgo),
     supabase.from('blogs').select('id', { count: 'exact', head: true }).eq('status', 'in-review'),
-    supabase.from('blog_titles').select('id, title, client_id, client_approved, needs_review, updated_at, clients(name)').or('client_approved.eq.true,needs_review.eq.true').gte('updated_at', sevenDaysAgo).order('updated_at', { ascending: false }).limit(15),
+    supabase.from('blog_titles').select('id, title, client_id, client_approved, needs_review, updated_at, clients(name, id)').or('client_approved.eq.true,needs_review.eq.true').gte('updated_at', sevenDaysAgo).order('updated_at', { ascending: false }).limit(20),
     supabase.from('clients').select('id', { count: 'exact', head: true })
   ]);
+
+  // Build per-client alert counts from recent activity
+  const activityData = recentActivity.data || [];
+  const clientAlerts = {};
+  for (const item of activityData) {
+    const cid = item.client_id;
+    if (!clientAlerts[cid]) clientAlerts[cid] = { approvals: 0, suggestions: 0 };
+    if (item.client_approved) clientAlerts[cid].approvals++;
+    if (item.needs_review) clientAlerts[cid].suggestions++;
+  }
 
   res.json({
     totalClients: totalClients.count || 0,
@@ -510,8 +520,25 @@ app.get('/api/dashboard-stats', async (req, res) => {
     blogsThisMonth: monthBlogs.count || 0,
     blogsLast30Days: thirtyBlogs.count || 0,
     pendingApproval: pendingBlogs.count || 0,
-    recentActivity: recentActivity.data || []
+    recentActivity: activityData,
+    clientAlerts // { clientId: { approvals: N, suggestions: N } }
   });
+});
+
+// ─── CLIENT ALERTS ────────────────────────────────────────────────────────────
+
+// Returns counts of pending client feedback for a specific client
+app.get('/api/clients/:id/alerts', async (req, res) => {
+  const { data, error } = await supabase
+    .from('blog_titles')
+    .select('id, client_approved, needs_review, client_suggestion')
+    .eq('client_id', req.params.id)
+    .or('client_approved.eq.true,needs_review.eq.true');
+  if (error) return res.status(500).json({ error: error.message });
+
+  const approvals = (data || []).filter(t => t.client_approved).length;
+  const suggestions = (data || []).filter(t => t.needs_review).length;
+  res.json({ approvals, suggestions, total: approvals + suggestions, items: data || [] });
 });
 
 // ─── TOPIC CLUSTERS ───────────────────────────────────────────────────────────

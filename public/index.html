@@ -290,13 +290,10 @@ async function loadDashboardStats() {
   try {
     const stats = await fetch(`${API}/api/dashboard-stats`).then(r => r.json());
     state.dashboardStats = stats;
+    // clientAlerts is a map of clientId -> { approvals, suggestions }
+    state.clientAlerts = stats.clientAlerts || {};
     if (state.activeView === 'dashboard') renderDashboard();
-    // Mark clients with recent activity
-    if (stats.recentActivity?.length) {
-      const activeClientIds = new Set(stats.recentActivity.map(a => a.client_id));
-      state.clientsWithActivity = activeClientIds;
-      renderClientList();
-    }
+    renderClientList(); // Re-render to show/update alert dots
   } catch(e) {}
 }
 
@@ -304,11 +301,12 @@ function renderClientList() {
   const el = document.getElementById('clientList');
   if (!state.clients.length) { el.innerHTML = `<div style="padding:12px 20px;font-size:12px;color:rgba(255,255,255,0.3);">No clients</div>`; return; }
   el.innerHTML = state.clients.map(c => {
-    const hasAlert = state.clientsWithActivity?.has(c.id);
+    const alerts = state.clientAlerts?.[c.id];
+    const totalAlerts = alerts ? (alerts.approvals + alerts.suggestions) : 0;
     return `<div class="client-item ${state.activeClient?.id===c.id?'active':''}" onclick="selectClient('${c.id}')">
       <span class="client-name">${c.name}</span>
       ${c.vertical?`<span class="client-badge">${c.vertical.split('/')[0].trim()}</span>`:''}
-      ${hasAlert?`<span class="client-alert" title="Recent client activity"></span>`:''}
+      ${totalAlerts > 0 ? `<span class="client-alert" title="${alerts.approvals} approval${alerts.approvals!==1?'s':''}, ${alerts.suggestions} suggestion${alerts.suggestions!==1?'s':''}"></span>` : ''}
     </div>`;
   }).join('');
 }
@@ -456,11 +454,43 @@ function renderClientTab() {
 async function renderTitlesTab() {
   const el=document.getElementById('clientTabContent');
   el.innerHTML=`<div style="text-align:center;padding:40px;"><div class="spinner spinner-dark" style="margin:0 auto;width:28px;height:28px;border-width:3px;"></div></div>`;
-  const titles=await fetch(`${API}/api/clients/${state.activeClient.id}/titles`).then(r=>r.json());
+
+  const [titles, alerts] = await Promise.all([
+    fetch(`${API}/api/clients/${state.activeClient.id}/titles`).then(r=>r.json()),
+    fetch(`${API}/api/clients/${state.activeClient.id}/alerts`).then(r=>r.json())
+  ]);
+
   const proposed=titles.filter(t=>t.status==='proposed');
   const approved=titles.filter(t=>t.status==='approved');
   const others=titles.filter(t=>!['proposed','approved'].includes(t.status));
+
+  // Build alert banner if there's pending client feedback
+  let alertBanner = '';
+  if (alerts.total > 0) {
+    const parts = [];
+    if (alerts.approvals > 0) parts.push(`<strong>${alerts.approvals}</strong> title${alerts.approvals!==1?'s':''} approved by client`);
+    if (alerts.suggestions > 0) parts.push(`<strong>${alerts.suggestions}</strong> suggestion${alerts.suggestions!==1?'s':''} waiting for review`);
+    alertBanner = `
+      <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:20px;">🔔</span>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#92400E;">Client feedback received</div>
+            <div style="font-size:12px;color:#92400E;margin-top:2px;">${parts.join(' · ')}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          ${alerts.approvals > 0 ? `<span style="background:var(--light-green);color:var(--green);font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;">✓ ${alerts.approvals} approved</span>` : ''}
+          ${alerts.suggestions > 0 ? `<span style="background:#FEF3C7;color:#92400E;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;">💬 ${alerts.suggestions} to review</span>` : ''}
+        </div>
+      </div>`;
+    // Update sidebar dot with fresh data
+    if (!state.clientAlerts) state.clientAlerts = {};
+    state.clientAlerts[state.activeClient.id] = { approvals: alerts.approvals, suggestions: alerts.suggestions };
+    renderClientList();
+  }
   el.innerHTML=`
+    ${alertBanner}
     <div class="card">
       <div class="card-title">Generate New Titles</div>
       <div class="form-row">
