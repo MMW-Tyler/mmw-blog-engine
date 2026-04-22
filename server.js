@@ -356,8 +356,7 @@ app.post('/api/generate-blog', async (req, res) => {
       title_tag: metadata.titleTag, meta_description: metadata.metaDescription,
       slug: metadata.slug, internal_links_used: metadata.internalLinksUsed,
       faq_json: faqJson, schema_json: schemaJson,
-      status: 'draft', is_one_off: isOneOff,
-      scheduled_date: scheduledDate || null
+      status: 'draft', is_one_off: isOneOff
     };
 
     const { data: savedBlog, error: saveError } = await supabase.from('blogs').insert(blogRecord).select().single();
@@ -372,10 +371,112 @@ app.post('/api/generate-blog', async (req, res) => {
   }
 });
 
+// ─── BATCH BLOG GENERATION ───────────────────────────────────────────────────
+
+// Returns status of a batch job stored in-memory (sufficient for single-server Render deploy)
+const batchJobs = {};
+
+app.post('/api/clients/:id/batch-generate', async (req, res) => {
+  const { titleIds } = req.body;
+  if (!titleIds || !titleIds.length) return res.status(400).json({ error: 'No title IDs provided' });
+
+  const jobId = `${req.params.id}_${Date.now()}`;
+  batchJobs[jobId] = { total: titleIds.length, completed: 0, failed: 0, results: [], status: 'running' };
+
+  // Respond immediately so the UI doesn't wait
+  res.json({ jobId, total: titleIds.length });
+
+  // Run sequentially in the background
+  (async () => {
+    const [profileResult, rulesResult] = await Promise.all([
+      supabase.from('client_profiles').select('brand_voice, sitemap_pages, location').eq('client_id', req.params.id).single(),
+      supabase.from('brand_rules').select('rule').eq('client_id', req.params.id).order('created_at')
+    ]);
+    const profile = profileResult.data;
+    const rules = (rulesResult.data || []).map(r => r.rule);
+
+    for (const titleId of titleIds) {
+      try {
+        const { data: titleData } = await supabase.from('blog_titles').select('title, target_keyword').eq('id', titleId).single();
+        if (!titleData) { batchJobs[jobId].failed++; continue; }
+
+        const prompt = buildBlogPrompt({
+          title: titleData.title, targetKeyword: titleData.target_keyword,
+          brandVoice: profile?.brand_voice, brandRules: rules,
+          sitemapReferences: profile?.sitemap_pages || [], location: profile?.location
+        });
+
+        const message = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 8000, messages: [{ role: 'user', content: prompt }] });
+        const rawContent = message.content[0].text;
+
+        let faqJson = null;
+        const faqMatch = rawContent.match(/---FAQ---([\s\S]*?)---END FAQ---/);
+        if (faqMatch) {
+          const lines = faqMatch[1].trim().split('\n');
+          const faqs = []; let currentQ = null;
+          for (const line of lines) {
+            const qm = line.match(/^Q:\s*(.+)/), am = line.match(/^A:\s*(.+)/);
+            if (qm) currentQ = qm[1].trim();
+            else if (am && currentQ) { faqs.push({ question: currentQ, answer: am[1].trim() }); currentQ = null; }
+          }
+          if (faqs.length) faqJson = faqs;
+        }
+
+        let schemaJson = null;
+        const schemaMatch = rawContent.match(/---SCHEMA---([\s\S]*?)---END SCHEMA---/);
+        if (schemaMatch) schemaJson = schemaMatch[1].trim();
+
+        const metaMatch = rawContent.match(/---SEO METADATA---([\s\S]*?)---END METADATA---/);
+        let metadata = {};
+        if (metaMatch) {
+          const mt = metaMatch[1];
+          metadata.titleTag = (mt.match(/Title Tag:\s*(.+)/) || [])[1]?.trim();
+          metadata.metaDescription = (mt.match(/Meta Description:\s*(.+)/) || [])[1]?.trim();
+          metadata.slug = (mt.match(/Slug:\s*(.+)/) || [])[1]?.trim();
+          metadata.targetKeyword = (mt.match(/Target Keyword:\s*(.+)/) || [])[1]?.trim();
+          metadata.internalLinksUsed = (mt.match(/Internal Links Used:\s*([\s\S]+)/) || [])[1]?.trim();
+        }
+
+        const cleanContent = rawContent
+          .replace(/---FAQ---[\s\S]*?---END FAQ---/, '')
+          .replace(/---SEO METADATA---[\s\S]*?---END METADATA---/, '')
+          .replace(/---SCHEMA---[\s\S]*?---END SCHEMA---/, '')
+          .trim();
+
+        const { data: savedBlog } = await supabase.from('blogs').insert({
+          client_id: req.params.id, title_id: titleId, title: titleData.title,
+          target_keyword: titleData.target_keyword || metadata.targetKeyword,
+          content: cleanContent, title_tag: metadata.titleTag,
+          meta_description: metadata.metaDescription, slug: metadata.slug,
+          internal_links_used: metadata.internalLinksUsed,
+          faq_json: faqJson, schema_json: schemaJson,
+          status: 'draft', is_one_off: false
+        }).select().single();
+
+        await supabase.from('blog_titles').update({ status: 'in_progress' }).eq('id', titleId);
+        batchJobs[jobId].completed++;
+        batchJobs[jobId].results.push({ titleId, blogId: savedBlog?.id, title: titleData.title });
+      } catch (err) {
+        console.error(`Batch generation error for title ${titleId}:`, err);
+        batchJobs[jobId].failed++;
+      }
+    }
+    batchJobs[jobId].status = 'done';
+    // Clean up after 1 hour
+    setTimeout(() => { delete batchJobs[jobId]; }, 3600000);
+  })();
+});
+
+app.get('/api/batch-status/:jobId', (req, res) => {
+  const job = batchJobs[req.params.jobId];
+  if (!job) return res.status(404).json({ error: 'Job not found' });
+  res.json(job);
+});
+
 // ─── BLOGS CRUD ───────────────────────────────────────────────────────────────
 
 app.get('/api/clients/:id/blogs', async (req, res) => {
-  const { data, error } = await supabase.from('blogs').select('id, title, target_keyword, status, is_one_off, created_at, slug, wp_post_id, scheduled_date').eq('client_id', req.params.id).order('created_at', { ascending: false });
+  const { data, error } = await supabase.from('blogs').select('id, title, target_keyword, status, is_one_off, created_at, slug, wp_post_id').eq('client_id', req.params.id).order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -568,9 +669,7 @@ app.post('/api/blogs/:blogId/push-to-wp', upload.fields([{ name: 'featuredImage'
     if (!wpRes.ok) { const e = await wpRes.text(); return res.status(400).json({ error: `WordPress error: ${e}` }); }
     const wpPost = await wpRes.json();
 
-    const updateData = { wp_post_id: wpPost.id, status: 'published' };
-    if (req.body.publishDate) updateData.scheduled_publish_date = req.body.publishDate;
-    await supabase.from('blogs').update(updateData).eq('id', req.params.blogId);
+    await supabase.from('blogs').update({ wp_post_id: wpPost.id, status: 'published' }).eq('id', req.params.blogId);
 
     res.json({ success: true, wpPostId: wpPost.id, wpEditUrl: `${wpUrl}/wp-admin/post.php?post=${wpPost.id}&action=edit` });
   } catch (err) {

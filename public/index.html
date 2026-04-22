@@ -230,9 +230,69 @@
 
 <script>
 const API = '';
-let state = { clients: [], activeClient: null, activeView: 'dashboard', clientTab: 'titles', editingClientId: null, wpPushBlogId: null };
+let state = { clients: [], activeClient: null, activeView: 'dashboard', clientTab: 'titles', editingClientId: null, wpPushBlogId: null, batchJobId: null, batchPollInterval: null };
 
 async function init() { await loadClients(); renderView(); }
+
+async function startBatchGenerate(titleIds) {
+  if (!titleIds || !titleIds.length) return;
+  if (!confirm(`Generate ${titleIds.length} blog${titleIds.length > 1 ? 's' : ''} in the background? You can navigate away — a progress bar will show status.`)) return;
+
+  try {
+    const data = await fetch(`${API}/api/clients/${state.activeClient.id}/batch-generate`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ titleIds })
+    }).then(r => r.json());
+    if (data.error) throw new Error(data.error);
+    state.batchJobId = data.jobId;
+    showBatchProgress(0, data.total, 0);
+    // Poll every 8 seconds
+    state.batchPollInterval = setInterval(() => pollBatchJob(), 8000);
+  } catch(e) { alert(`Failed to start batch generation: ${e.message}`); }
+}
+
+async function pollBatchJob() {
+  if (!state.batchJobId) { clearInterval(state.batchPollInterval); return; }
+  try {
+    const job = await fetch(`${API}/api/batch-status/${state.batchJobId}`).then(r => r.json());
+    if (job.error) { clearInterval(state.batchPollInterval); hideBatchProgress(); return; }
+    showBatchProgress(job.completed, job.total, job.failed);
+    if (job.status === 'done') {
+      clearInterval(state.batchPollInterval);
+      state.batchJobId = null;
+      setTimeout(() => {
+        hideBatchProgress();
+        showToast(`✅ ${job.completed} blog${job.completed !== 1 ? 's' : ''} generated!${job.failed ? ` (${job.failed} failed)` : ''}`);
+        if (state.clientTab === 'blogs') renderBlogsTab();
+        if (state.clientTab === 'titles') renderTitlesTab();
+      }, 1500);
+    }
+  } catch(e) { console.error('Poll error:', e); }
+}
+
+function showBatchProgress(completed, total, failed) {
+  let bar = document.getElementById('batchProgressBar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'batchProgressBar';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:200;background:var(--dark);color:white;padding:10px 24px;display:flex;align-items:center;gap:16px;font-family:var(--font-ui);font-size:13px;box-shadow:0 2px 12px rgba(0,0,0,0.3);';
+    document.body.appendChild(bar);
+  }
+  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+  bar.innerHTML = `
+    <span style="color:var(--green);">⚡</span>
+    <span>Generating blogs in background...</span>
+    <div style="flex:1;background:rgba(255,255,255,0.15);border-radius:10px;height:6px;overflow:hidden;">
+      <div style="width:${pct}%;height:100%;background:var(--green);border-radius:10px;transition:width 0.5s;"></div>
+    </div>
+    <span style="white-space:nowrap;">${completed} / ${total}${failed ? ` <span style="color:#FCA5A5;">(${failed} failed)</span>` : ''}</span>
+  `;
+}
+
+function hideBatchProgress() {
+  const bar = document.getElementById('batchProgressBar');
+  if (bar) bar.remove();
+}
 
 async function loadClients() {
   try { state.clients = await fetch(`${API}/api/clients`).then(r => r.json()); renderClientList(); }
@@ -359,7 +419,16 @@ async function renderTitlesTab() {
       </div>
       ${proposed.map(t=>renderTitleCard(t)).join('')}
     </div>` : ''}
-    ${approved.length ? `<div class="card"><div class="card-title">Approved — Ready to Write <span style="font-size:12px;color:var(--green);font-weight:400;">${approved.length} approved</span></div>${approved.map(t=>renderTitleCard(t)).join('')}</div>` : ''}
+    ${approved.length ? `<div class="card">
+      <div class="card-title">
+        Approved — Ready to Write
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="font-size:12px;color:var(--green);font-weight:400;">${approved.length} approved</span>
+          <button class="btn btn-primary btn-sm" onclick="startBatchGenerate(${JSON.stringify(approved.map(t=>t.id))})">⚡ Generate All (${approved.length})</button>
+        </div>
+      </div>
+      ${approved.map(t=>renderTitleCard(t)).join('')}
+    </div>` : ''}
     ${others.length ? `<div class="card"><div class="card-title">In Progress / Completed</div>${others.map(t=>renderTitleCard(t)).join('')}</div>` : ''}
     ${!titles.length ? `<div class="card"><div class="empty-state"><div class="icon">🎯</div><div class="title">No titles yet</div><div class="desc">Generate your first batch of blog titles above.</div></div></div>` : ''}
   `;
@@ -457,12 +526,27 @@ async function runGenerate(titleId) {
   btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Writing...`;
   result.innerHTML = `<div class="generation-progress"><div class="spinner spinner-dark" style="width:28px;height:28px;margin:0 auto;border-width:3px;"></div><p>Writing your blog — this takes about 30–60 seconds...</p></div>`;
   try {
-    const data = await fetch(`${API}/api/generate-blog`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({clientId:state.activeClient.id,titleId,title,targetKeyword:keyword,isOneOff:false, scheduledDate: document.getElementById('genScheduledDate')?.value || null}) }).then(r=>r.json());
+    const res = await fetch(`${API}/api/generate-blog`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId: state.activeClient.id, titleId, title, targetKeyword: keyword, isOneOff: false })
+    });
+    const data = await res.json();
     if (data.error) throw new Error(data.error);
-    closeModal('generateModal');
-    openBlogView(data.blog);
-    if (state.clientTab==='blogs') renderBlogsTab();
-  } catch(e) { result.innerHTML=`<div class="alert alert-error">❌ ${e.message}</div>`; btn.disabled=false; btn.innerHTML='✍️ Generate'; }
+    if (!data.blog) throw new Error('No blog returned from server');
+    result.innerHTML = `<div class="alert alert-success">✅ Blog generated successfully!</div>`;
+    btn.textContent = 'View Blog';
+    btn.disabled = false;
+    btn.onclick = () => { closeModal('generateModal'); openBlogView(data.blog); };
+    // Refresh blogs tab in background
+    if (state.clientTab === 'blogs') renderBlogsTab();
+  } catch(e) {
+    console.error('Generate error:', e);
+    result.innerHTML = `<div class="alert alert-error">❌ ${e.message}</div>`;
+    btn.disabled = false;
+    btn.innerHTML = '✍️ Try Again';
+    btn.onclick = () => runGenerate(titleId);
+  }
 }
 
 // ── BLOGS TAB ──────────────────────────────────────────────────────
@@ -478,12 +562,12 @@ async function renderBlogsTab() {
     : Object.entries(groups).filter(([,b])=>b.length).map(([status,items])=>`
     <div class="card">
       <div class="card-title">${statusIcon[status]} ${formatStatus(status)} <span style="font-size:12px;color:var(--muted);font-weight:400;">${items.length} blog${items.length!==1?'s':''}</span></div>
-      <div class="table-wrap"><table><thead><tr><th>Title</th><th>Keyword</th><th>Type</th><th>Scheduled</th><th>Actions</th></tr></thead><tbody>
+      <div class="table-wrap"><table><thead><tr><th>Title</th><th>Keyword</th><th>Type</th><th>Created</th><th>Actions</th></tr></thead><tbody>
         ${items.map(b=>`<tr>
           <td style="font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(b.title)}">${escapeHtml(b.title)}</td>
           <td style="font-size:12px;color:var(--muted);">${b.target_keyword||'–'}</td>
           <td><span style="font-size:11px;color:${b.is_one_off?'var(--muted)':'var(--green)'};">${b.is_one_off?'One-Off':'From Queue'}</span></td>
-          <td style="font-size:12px;color:var(--muted);">${b.scheduled_date ? formatDate(b.scheduled_date) : '–'}</td>
+          <td style="font-size:12px;color:var(--muted);">${formatDate(b.created_at)}</td>
           <td><div style="display:flex;gap:6px;flex-wrap:wrap;">
             <button class="btn btn-secondary btn-sm" onclick="viewBlog('${b.id}')">View</button>
             <button class="btn btn-secondary btn-sm" onclick="exportBlog('${b.id}')">⬇️ .docx</button>
