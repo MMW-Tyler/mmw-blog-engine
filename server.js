@@ -25,6 +25,14 @@ app.get('/review/:token', (req, res) => res.sendFile('review.html', { root: 'pub
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
+// Model used for all AI generations — change here to upgrade app-wide
+const CLAUDE_MODEL = 'claude-sonnet-4-6';
+
+// Startup validation of required env vars
+['ANTHROPIC_API_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY'].forEach(key => {
+  if (!process.env[key]) console.warn(`⚠️  Missing env var: ${key}`);
+});
+
 // ─── HEALTH ───────────────────────────────────────────────────────────────────
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
@@ -32,15 +40,27 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 // ─── CLIENTS ─────────────────────────────────────────────────────────────────
 
 app.get('/api/clients', async (req, res) => {
-  const { data, error } = await supabase.from('clients').select('id, name, vertical, wp_url, created_at, assigned_ae').order('name');
+  const showArchived = req.query.archived === 'true';
+  let query = supabase.from('clients').select('id, name, vertical, wp_url, created_at, assigned_ae, archived').order('name');
+  if (!showArchived) query = query.or('archived.is.null,archived.eq.false');
+  const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
 app.post('/api/clients', async (req, res) => {
-  const { name, vertical, wp_url, wp_username, wp_app_password, assigned_ae } = req.body;
+  const { name, vertical, wp_url, wp_username, wp_app_password, assigned_ae, force } = req.body;
   if (!name) return res.status(400).json({ error: 'Client name is required' });
-  const { data, error } = await supabase.from('clients').insert({ name, vertical, wp_url, wp_username, wp_app_password, assigned_ae }).select().single();
+
+  // Duplicate detection (case-insensitive) unless force flag set
+  if (!force) {
+    const { data: existing } = await supabase.from('clients').select('id, name').ilike('name', name.trim());
+    if (existing && existing.length > 0) {
+      return res.status(409).json({ duplicate: true, existing: existing[0], message: `A client named "${existing[0].name}" already exists.` });
+    }
+  }
+
+  const { data, error } = await supabase.from('clients').insert({ name: name.trim(), vertical, wp_url, wp_username, wp_app_password, assigned_ae }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -48,17 +68,18 @@ app.post('/api/clients', async (req, res) => {
 app.put('/api/clients/:id', async (req, res) => {
   const { name, vertical, wp_url, wp_username, wp_app_password, assigned_ae } = req.body;
   const updates = { name, vertical, wp_url, wp_username, assigned_ae };
-  // Only overwrite the password if a new one was actually provided
   if (wp_app_password && wp_app_password.trim()) updates.wp_app_password = wp_app_password;
   const { data, error } = await supabase.from('clients').update(updates).eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
-app.delete('/api/clients/:id', async (req, res) => {
-  const { error } = await supabase.from('clients').delete().eq('id', req.params.id);
+// Archive / unarchive — never hard delete
+app.post('/api/clients/:id/archive', async (req, res) => {
+  const { archived } = req.body;
+  const { data, error } = await supabase.from('clients').update({ archived: archived !== false }).eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true });
+  res.json(data);
 });
 
 // ─── CLIENT PROFILE ───────────────────────────────────────────────────────────
@@ -70,14 +91,30 @@ app.get('/api/clients/:id/profile', async (req, res) => {
 });
 
 app.post('/api/clients/:id/profile', async (req, res) => {
-  const { brand_voice, target_keywords, location, service_areas, sitemap_pages, blogs_per_month, schedule_start_date } = req.body;
+  const { brand_voice, target_keywords, location, service_areas, sitemap_pages, blogs_per_month, schedule_start_date, wp_categories } = req.body;
+
+  // Fetch existing profile so partial saves don't wipe other fields
+  const { data: existing } = await supabase.from('client_profiles').select('*').eq('client_id', req.params.id).single();
+
+  // Build merge object — only include fields that were explicitly sent
+  const updates = { client_id: req.params.id };
+  if (brand_voice !== undefined) updates.brand_voice = brand_voice;
+  if (target_keywords !== undefined) updates.target_keywords = target_keywords;
+  if (location !== undefined) updates.location = location;
+  if (service_areas !== undefined) updates.service_areas = service_areas;
+  if (sitemap_pages !== undefined) updates.sitemap_pages = sitemap_pages || [];
+  if (wp_categories !== undefined) updates.wp_categories = wp_categories || [];
+  if (blogs_per_month !== undefined && blogs_per_month !== null && blogs_per_month !== '') {
+    const parsed = parseInt(blogs_per_month);
+    if (!isNaN(parsed)) updates.blogs_per_month = Math.min(Math.max(parsed, 1), 12);
+  }
+  if (schedule_start_date !== undefined) updates.schedule_start_date = schedule_start_date || null;
+
+  // Set defaults only if this is the first profile save
+  if (!existing && updates.blogs_per_month === undefined) updates.blogs_per_month = 2;
+
   const { data, error } = await supabase.from('client_profiles')
-    .upsert({
-      client_id: req.params.id, brand_voice, target_keywords, location, service_areas,
-      sitemap_pages: sitemap_pages || [],
-      blogs_per_month: blogs_per_month ? parseInt(blogs_per_month) : 2,
-      schedule_start_date: schedule_start_date || null
-    }, { onConflict: 'client_id' })
+    .upsert(updates, { onConflict: 'client_id' })
     .select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
@@ -96,9 +133,20 @@ app.post('/api/clients/:id/sitemap', upload.single('sitemap'), async (req, res) 
   } catch {
     pages = content.split('\n').map(l => l.trim()).filter(l => l.startsWith('http')).map(url => ({ url, title: extractTitleFromUrl(url) }));
   }
-  const { error } = await supabase.from('client_profiles').upsert({ client_id: req.params.id, sitemap_pages: pages }, { onConflict: 'client_id' });
+
+  // Preserve existing target keywords when re-uploading — match by URL
+  const { data: existingProfile } = await supabase.from('client_profiles').select('sitemap_pages').eq('client_id', req.params.id).single();
+  const existingByUrl = {};
+  (existingProfile?.sitemap_pages || []).forEach(p => { if (p.url) existingByUrl[p.url] = p; });
+  const mergedPages = pages.map(p => {
+    const existing = existingByUrl[p.url];
+    return existing?.targetKeyword ? { ...p, targetKeyword: existing.targetKeyword } : p;
+  });
+  const preservedCount = mergedPages.filter(p => p.targetKeyword).length;
+
+  const { error } = await supabase.from('client_profiles').upsert({ client_id: req.params.id, sitemap_pages: mergedPages }, { onConflict: 'client_id' });
   if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true, count: pages.length, pages: pages.slice(0, 10) });
+  res.json({ success: true, count: mergedPages.length, preservedKeywords: preservedCount, pages: mergedPages.slice(0, 10) });
 });
 
 function extractTitleFromUrl(url) {
@@ -159,7 +207,7 @@ app.post('/api/clients/:id/generate-titles', async (req, res) => {
   });
 
   try {
-    const message = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 4000, messages: [{ role: 'user', content: prompt }] });
+    const message = await anthropic.messages.create({ model: CLAUDE_MODEL, max_tokens: 4000, messages: [{ role: 'user', content: prompt }] });
     const raw = message.content[0].text.trim();
     let parsed;
     try { parsed = JSON.parse(raw); }
@@ -327,7 +375,7 @@ app.post('/api/generate-blog', async (req, res) => {
   });
 
   try {
-    const message = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 8000, messages: [{ role: 'user', content: prompt }] });
+    const message = await anthropic.messages.create({ model: CLAUDE_MODEL, max_tokens: 8000, messages: [{ role: 'user', content: prompt }] });
     const rawContent = message.content[0].text;
 
     // Parse FAQ block
@@ -406,7 +454,7 @@ app.post('/api/titles/:titleId/rewrite', async (req, res) => {
   if (!title.client_suggestion) return res.status(400).json({ error: 'No client suggestion on this title' });
 
   const [profileResult] = await Promise.all([
-    supabase.from('client_profiles').select('brand_voice, target_keywords, location, sitemap_pages').eq('client_id', title.client_id).single()
+    supabase.from('client_profiles').select('brand_voice, target_keywords, location, service_areas, sitemap_pages').eq('client_id', title.client_id).single()
   ]);
   const profile = profileResult.data;
 
@@ -417,12 +465,13 @@ app.post('/api/titles/:titleId/rewrite', async (req, res) => {
     brandVoice: profile?.brand_voice,
     targetKeywords: profile?.target_keywords,
     location: profile?.location,
+    serviceAreas: profile?.service_areas,
     sitemapReferences: profile?.sitemap_pages || []
   });
 
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: CLAUDE_MODEL,
       max_tokens: 1000,
       messages: [{ role: 'user', content: prompt }]
     });
@@ -495,23 +544,32 @@ app.get('/api/dashboard-stats', async (req, res) => {
   const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
   const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [allBlogs, monthBlogs, thirtyBlogs, pendingBlogs, recentActivity, totalClients] = await Promise.all([
+  const [allBlogs, monthBlogs, thirtyBlogs, pendingBlogs, recentTitleActivity, recentBlogActivity, totalClients] = await Promise.all([
     supabase.from('blogs').select('id', { count: 'exact', head: true }),
     supabase.from('blogs').select('id', { count: 'exact', head: true }).eq('status', 'published').gte('created_at', startOfMonth),
     supabase.from('blogs').select('id', { count: 'exact', head: true }).gte('created_at', thirtyDaysAgo),
     supabase.from('blogs').select('id', { count: 'exact', head: true }).eq('status', 'in-review'),
     supabase.from('blog_titles').select('id, title, client_id, client_approved, needs_review, updated_at, clients(name, id)').or('client_approved.eq.true,needs_review.eq.true').gte('updated_at', sevenDaysAgo).order('updated_at', { ascending: false }).limit(20),
+    supabase.from('blogs').select('id, title, client_id, client_blog_approved, client_blog_feedback, client_feedback_at, clients(name, id)').or('client_blog_approved.eq.true,client_blog_feedback.not.is.null').gte('client_feedback_at', sevenDaysAgo).order('client_feedback_at', { ascending: false }).limit(10),
     supabase.from('clients').select('id', { count: 'exact', head: true })
   ]);
 
-  // Build per-client alert counts from recent activity
-  const activityData = recentActivity.data || [];
+  const titleActivity = (recentTitleActivity.data || []).map(a => ({ ...a, type: 'title' }));
+  const blogActivity = (recentBlogActivity.data || []).map(a => ({ ...a, type: 'blog', updated_at: a.client_feedback_at }));
+  const allActivity = [...titleActivity, ...blogActivity].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, 20);
+
   const clientAlerts = {};
-  for (const item of activityData) {
+  for (const item of titleActivity) {
     const cid = item.client_id;
-    if (!clientAlerts[cid]) clientAlerts[cid] = { approvals: 0, suggestions: 0 };
-    if (item.client_approved) clientAlerts[cid].approvals++;
-    if (item.needs_review) clientAlerts[cid].suggestions++;
+    if (!clientAlerts[cid]) clientAlerts[cid] = { titleApprovals: 0, titleSuggestions: 0, blogApprovals: 0, blogFeedback: 0 };
+    if (item.client_approved) clientAlerts[cid].titleApprovals++;
+    if (item.needs_review) clientAlerts[cid].titleSuggestions++;
+  }
+  for (const item of blogActivity) {
+    const cid = item.client_id;
+    if (!clientAlerts[cid]) clientAlerts[cid] = { titleApprovals: 0, titleSuggestions: 0, blogApprovals: 0, blogFeedback: 0 };
+    if (item.client_blog_approved) clientAlerts[cid].blogApprovals++;
+    if (item.client_blog_feedback) clientAlerts[cid].blogFeedback++;
   }
 
   res.json({
@@ -520,8 +578,8 @@ app.get('/api/dashboard-stats', async (req, res) => {
     blogsThisMonth: monthBlogs.count || 0,
     blogsLast30Days: thirtyBlogs.count || 0,
     pendingApproval: pendingBlogs.count || 0,
-    recentActivity: activityData,
-    clientAlerts // { clientId: { approvals: N, suggestions: N } }
+    recentActivity: allActivity,
+    clientAlerts
   });
 });
 
@@ -529,16 +587,22 @@ app.get('/api/dashboard-stats', async (req, res) => {
 
 // Returns counts of pending client feedback for a specific client
 app.get('/api/clients/:id/alerts', async (req, res) => {
-  const { data, error } = await supabase
-    .from('blog_titles')
-    .select('id, client_approved, needs_review, client_suggestion')
-    .eq('client_id', req.params.id)
-    .or('client_approved.eq.true,needs_review.eq.true');
-  if (error) return res.status(500).json({ error: error.message });
+  const [titleData, blogData] = await Promise.all([
+    supabase.from('blog_titles').select('id, client_approved, needs_review, client_suggestion').eq('client_id', req.params.id).or('client_approved.eq.true,needs_review.eq.true'),
+    supabase.from('blogs').select('id, title, client_blog_approved, client_blog_feedback, client_feedback_at').eq('client_id', req.params.id).or('client_blog_approved.eq.true,client_blog_feedback.not.is.null')
+  ]);
 
-  const approvals = (data || []).filter(t => t.client_approved).length;
-  const suggestions = (data || []).filter(t => t.needs_review).length;
-  res.json({ approvals, suggestions, total: approvals + suggestions, items: data || [] });
+  const titleApprovals = (titleData.data || []).filter(t => t.client_approved).length;
+  const titleSuggestions = (titleData.data || []).filter(t => t.needs_review).length;
+  const blogApprovals = (blogData.data || []).filter(b => b.client_blog_approved).length;
+  const blogFeedback = (blogData.data || []).filter(b => b.client_blog_feedback).length;
+
+  res.json({
+    titleApprovals, titleSuggestions,
+    blogApprovals, blogFeedback,
+    total: titleApprovals + titleSuggestions + blogApprovals + blogFeedback,
+    blogs: blogData.data || []
+  });
 });
 
 // ─── TOPIC CLUSTERS ───────────────────────────────────────────────────────────
@@ -547,6 +611,20 @@ app.get('/api/clients/:id/clusters', async (req, res) => {
   const { data, error } = await supabase.from('clusters').select('*, blog_titles(id, title, status, schedule_slot)').eq('client_id', req.params.id).order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
+});
+
+// Delete cluster — optionally delete its titles too
+app.delete('/api/clusters/:clusterId', async (req, res) => {
+  const { deleteTitles } = req.body;
+  if (deleteTitles) {
+    await supabase.from('blog_titles').delete().eq('cluster_id', req.params.clusterId);
+  } else {
+    // Just disassociate titles from cluster
+    await supabase.from('blog_titles').update({ cluster_id: null, cluster_position: null }).eq('cluster_id', req.params.clusterId);
+  }
+  const { error } = await supabase.from('clusters').delete().eq('id', req.params.clusterId);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
 });
 
 app.post('/api/clients/:id/generate-cluster', async (req, res) => {
@@ -568,7 +646,7 @@ app.post('/api/clients/:id/generate-cluster', async (req, res) => {
   });
 
   try {
-    const message = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] });
+    const message = await anthropic.messages.create({ model: CLAUDE_MODEL, max_tokens: 3000, messages: [{ role: 'user', content: prompt }] });
     const raw = message.content[0].text.trim();
     let parsed;
     try { parsed = JSON.parse(raw); }
@@ -620,10 +698,33 @@ app.get('/api/blog-preview/:token', async (req, res) => {
   try {
     const decoded = Buffer.from(req.params.token, 'base64url').toString();
     const blogId = decoded.split(':')[0];
-    const { data: blog, error } = await supabase.from('blogs').select('title, content, title_tag, meta_description, slug, target_keyword, word_count, faq_json, created_at').eq('id', blogId).single();
+    const { data: blog, error } = await supabase.from('blogs')
+      .select('title, content, title_tag, meta_description, slug, target_keyword, word_count, faq_json, created_at, client_blog_approved, client_blog_feedback')
+      .eq('id', blogId).single();
     if (error || !blog) return res.status(404).json({ error: 'Blog not found' });
     res.json(blog);
   } catch { res.status(404).json({ error: 'Invalid or expired link' }); }
+});
+
+// Client submits feedback or approval on a blog preview
+app.post('/api/blog-preview/:token/respond', async (req, res) => {
+  const { action, feedback } = req.body;
+  if (!['approved', 'feedback', 'undo'].includes(action)) return res.status(400).json({ error: 'Invalid action' });
+  try {
+    const decoded = Buffer.from(req.params.token, 'base64url').toString();
+    const blogId = decoded.split(':')[0];
+    let updates;
+    if (action === 'approved') {
+      updates = { client_blog_approved: true, client_blog_feedback: null, client_feedback_at: new Date().toISOString() };
+    } else if (action === 'feedback') {
+      updates = { client_blog_approved: false, client_blog_feedback: feedback, client_feedback_at: new Date().toISOString() };
+    } else {
+      updates = { client_blog_approved: false, client_blog_feedback: null, client_feedback_at: null };
+    }
+    const { error } = await supabase.from('blogs').update(updates).eq('id', blogId);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+  } catch { res.status(400).json({ error: 'Invalid token' }); }
 });
 
 app.get('/blog-preview/:token', (req, res) => res.sendFile('blog-preview.html', { root: 'public' }));
@@ -641,7 +742,7 @@ app.post('/api/clients/:id/batch-generate', async (req, res) => {
   // Respond immediately so the UI doesn't wait
   res.json({ jobId, total: titleIds.length });
 
-  // Run sequentially in the background
+  // Run in parallel with a concurrency cap to avoid hammering the API
   (async () => {
     const [profileResult, rulesResult] = await Promise.all([
       supabase.from('client_profiles').select('brand_voice, sitemap_pages, location, service_areas').eq('client_id', req.params.id).single(),
@@ -650,10 +751,13 @@ app.post('/api/clients/:id/batch-generate', async (req, res) => {
     const profile = profileResult.data;
     const rules = (rulesResult.data || []).map(r => r.rule);
 
-    for (const titleId of titleIds) {
+    const CONCURRENCY = 3;
+    let cursor = 0;
+
+    async function generateOne(titleId) {
       try {
         const { data: titleData } = await supabase.from('blog_titles').select('title, target_keyword, cluster_id').eq('id', titleId).single();
-        if (!titleData) { batchJobs[jobId].failed++; continue; }
+        if (!titleData) { batchJobs[jobId].failed++; return; }
 
         let clusterContext = null;
         if (titleData.cluster_id) {
@@ -669,7 +773,7 @@ app.post('/api/clients/:id/batch-generate', async (req, res) => {
           clusterContext
         });
 
-        const message = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 8000, messages: [{ role: 'user', content: prompt }] });
+        const message = await anthropic.messages.create({ model: CLAUDE_MODEL, max_tokens: 8000, messages: [{ role: 'user', content: prompt }] });
         const rawContent = message.content[0].text;
 
         let faqJson = null;
@@ -697,6 +801,7 @@ app.post('/api/clients/:id/batch-generate', async (req, res) => {
           metadata.metaDescription = (mt.match(/Meta Description:\s*(.+)/) || [])[1]?.trim();
           metadata.slug = (mt.match(/Slug:\s*(.+)/) || [])[1]?.trim();
           metadata.targetKeyword = (mt.match(/Target Keyword:\s*(.+)/) || [])[1]?.trim();
+          metadata.wordCount = (mt.match(/Word Count:\s*(\d+)/) || [])[1]?.trim();
           metadata.internalLinksUsed = (mt.match(/Internal Links Used:\s*([\s\S]+)/) || [])[1]?.trim();
         }
 
@@ -712,6 +817,7 @@ app.post('/api/clients/:id/batch-generate', async (req, res) => {
           content: cleanContent, title_tag: metadata.titleTag,
           meta_description: metadata.metaDescription, slug: metadata.slug,
           internal_links_used: metadata.internalLinksUsed,
+          word_count: metadata.wordCount ? parseInt(metadata.wordCount) : null,
           faq_json: faqJson, schema_json: schemaJson,
           status: 'draft', is_one_off: false
         }).select().single();
@@ -724,6 +830,16 @@ app.post('/api/clients/:id/batch-generate', async (req, res) => {
         batchJobs[jobId].failed++;
       }
     }
+
+    async function worker() {
+      while (cursor < titleIds.length) {
+        const idx = cursor++;
+        await generateOne(titleIds[idx]);
+      }
+    }
+
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, titleIds.length) }, () => worker()));
+
     batchJobs[jobId].status = 'done';
     // Clean up after 1 hour
     setTimeout(() => { delete batchJobs[jobId]; }, 3600000);
@@ -739,9 +855,11 @@ app.get('/api/batch-status/:jobId', (req, res) => {
 // ─── BLOGS CRUD ───────────────────────────────────────────────────────────────
 
 app.get('/api/clients/:id/blogs', async (req, res) => {
-  const { data, error } = await supabase.from('blogs').select('id, title, target_keyword, status, is_one_off, created_at, slug, wp_post_id, word_count').eq('client_id', req.params.id).order('created_at', { ascending: false });
+  const { data, error } = await supabase.from('blogs').select('id, title, target_keyword, status, is_one_off, created_at, slug, wp_post_id, word_count, client_blog_approved, client_blog_feedback, client_feedback_at, title_id, blog_titles(cluster_id)').eq('client_id', req.params.id).order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+  // Flatten nested cluster_id onto each blog
+  const flat = (data || []).map(b => ({ ...b, cluster_id: b.blog_titles?.cluster_id || null, blog_titles: undefined }));
+  res.json(flat);
 });
 
 app.get('/api/blogs/:blogId', async (req, res) => {

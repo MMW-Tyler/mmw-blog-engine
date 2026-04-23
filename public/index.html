@@ -207,7 +207,11 @@
         <div class="wp-step"><div class="wp-step-num">4</div><div>Copy the password shown — it won't be displayed again</div></div>
       </div>
     </div>
-    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('clientModal')">Cancel</button><button class="btn btn-primary" onclick="saveClient()" id="saveClientBtn">Save Client</button></div>
+    <div class="modal-footer">
+      <div style="margin-right:auto;" id="archiveBtnWrap"></div>
+      <button class="btn btn-secondary" onclick="closeModal('clientModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveClient()" id="saveClientBtn">Save Client</button>
+    </div>
   </div>
 </div>
 
@@ -254,6 +258,26 @@
   </div>
 </div>
 
+<!-- CUSTOM CONFIRM MODAL -->
+<div class="modal-overlay" id="confirmModal" style="display:none;">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header"><span class="modal-title" id="confirmTitle">Confirm</span><button class="modal-close" onclick="resolveConfirm(false)">✕</button></div>
+    <div class="modal-body" id="confirmBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="resolveConfirm(false)" id="confirmCancelBtn">Cancel</button>
+      <button class="btn btn-primary" onclick="resolveConfirm(true)" id="confirmOkBtn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- CLUSTER DELETE MODAL -->
+<div class="modal-overlay" id="clusterDeleteModal" style="display:none;">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-header"><span class="modal-title">Remove Cluster</span><button class="modal-close" onclick="closeModal('clusterDeleteModal')">✕</button></div>
+    <div class="modal-body" id="clusterDeleteBody"></div>
+  </div>
+</div>
+
 <script>
 const API = '';
 let state = {
@@ -274,11 +298,12 @@ function filterByAE() {
 }
 
 // ── CLIENTS ───────────────────────────────────────────────────────
-async function loadClients() {
+async function loadClients(showArchived = false) {
   try {
-    state.allClients = await fetch(`${API}/api/clients`).then(r => r.json());
+    const url = showArchived ? `${API}/api/clients?archived=true` : `${API}/api/clients`;
+    state.allClients = await fetch(url).then(r => r.json());
+    state.showArchived = showArchived;
     state.clients = [...state.allClients];
-    // Populate AE filter
     const aes = [...new Set(state.allClients.map(c => c.assigned_ae).filter(Boolean))].sort();
     const sel = document.getElementById('aeFilter');
     sel.innerHTML = `<option value="">All AEs</option>` + aes.map(ae => `<option value="${ae}">${ae}</option>`).join('');
@@ -290,10 +315,9 @@ async function loadDashboardStats() {
   try {
     const stats = await fetch(`${API}/api/dashboard-stats`).then(r => r.json());
     state.dashboardStats = stats;
-    // clientAlerts is a map of clientId -> { approvals, suggestions }
     state.clientAlerts = stats.clientAlerts || {};
     if (state.activeView === 'dashboard') renderDashboard();
-    renderClientList(); // Re-render to show/update alert dots
+    renderClientList();
   } catch(e) {}
 }
 
@@ -302,13 +326,14 @@ function renderClientList() {
   if (!state.clients.length) { el.innerHTML = `<div style="padding:12px 20px;font-size:12px;color:rgba(255,255,255,0.3);">No clients</div>`; return; }
   el.innerHTML = state.clients.map(c => {
     const alerts = state.clientAlerts?.[c.id];
-    const totalAlerts = alerts ? (alerts.approvals + alerts.suggestions) : 0;
-    return `<div class="client-item ${state.activeClient?.id===c.id?'active':''}" onclick="selectClient('${c.id}')">
-      <span class="client-name">${c.name}</span>
-      ${c.vertical?`<span class="client-badge">${c.vertical.split('/')[0].trim()}</span>`:''}
-      ${totalAlerts > 0 ? `<span class="client-alert" title="${alerts.approvals} approval${alerts.approvals!==1?'s':''}, ${alerts.suggestions} suggestion${alerts.suggestions!==1?'s':''}"></span>` : ''}
+    const totalAlerts = alerts ? (alerts.titleApprovals + alerts.titleSuggestions + alerts.blogApprovals + alerts.blogFeedback) : 0;
+    return `<div class="client-item ${state.activeClient?.id===c.id?'active':''} ${c.archived?'opacity-50':''}" onclick="selectClient('${c.id}')">
+      <span class="client-name" style="${c.archived?'opacity:0.5;text-decoration:line-through;':''}">${c.name}</span>
+      ${c.vertical&&!c.archived?`<span class="client-badge">${c.vertical.split('/')[0].trim()}</span>`:''}
+      ${c.archived?`<span style="font-size:9px;color:rgba(255,255,255,0.3);padding:1px 5px;border:1px solid rgba(255,255,255,0.15);border-radius:8px;">archived</span>`:''}
+      ${totalAlerts > 0 ? `<span class="client-alert" title="${totalAlerts} feedback item${totalAlerts!==1?'s':''} pending"></span>` : ''}
     </div>`;
-  }).join('');
+  }).join('') + `<div style="padding:10px 16px 6px;"><button onclick="loadClients(!state.showArchived)" style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:rgba(255,255,255,0.55);font-size:11px;font-family:var(--font-ui);font-weight:500;padding:6px;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">${state.showArchived ? '← Hide archived' : 'Show archived clients'}</button></div>`;
 }
 
 function selectClient(id) {
@@ -366,15 +391,18 @@ function renderDashboard() {
       <div class="card-title">🔔 Recent Client Activity <span style="font-size:12px;color:var(--muted);font-weight:400;">Last 7 days</span></div>
       <div>
         ${activity.map(a => `
-          <div class="activity-item">
-            <div class="activity-dot ${a.client_approved?'approved':'suggestion'}"></div>
+          <div class="activity-item" style="cursor:pointer;" onclick="openActivityItem('${a.client_id}', '${a.type}')" onmouseover="this.style.background='var(--off-white)'" onmouseout="this.style.background=''">
+            <div class="activity-dot ${(a.type==='blog'?a.client_blog_approved:a.client_approved)?'approved':'suggestion'}"></div>
             <div style="flex:1;">
               <div style="font-size:13px;font-weight:500;">${escapeHtml(a.clients?.name||'Unknown client')}</div>
-              <div style="font-size:12px;color:var(--muted);margin-top:2px;">${escapeHtml(a.title)}</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:2px;">${a.type==='blog'?'📄':'📋'} ${escapeHtml(a.title)}</div>
             </div>
-            <div style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;${a.client_approved?'background:var(--light-green);color:var(--green)':'background:#FFFBEB;color:#92400E'};">
-              ${a.client_approved ? '✓ Approved' : '💬 Suggestion'}
+            <div style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;${(a.type==='blog'?a.client_blog_approved:a.client_approved)?'background:var(--light-green);color:var(--green)':'background:#FFFBEB;color:#92400E'};">
+              ${a.type==='blog'
+                ? (a.client_blog_approved ? '✓ Blog approved' : '💬 Blog feedback')
+                : (a.client_approved ? '✓ Title approved' : '💬 Title suggestion')}
             </div>
+            <span style="color:var(--muted);font-size:14px;margin-left:4px;">›</span>
           </div>`).join('')}
       </div>
     </div>` : ''}
@@ -411,17 +439,24 @@ async function generateOneOff() {
   const clientId = document.getElementById('oneOffClient').value;
   const title = document.getElementById('oneOffTitle').value.trim();
   const keyword = document.getElementById('oneOffKeyword').value.trim();
-  if (!clientId || !title) { alert('Please select a client and enter a topic'); return; }
+  if (!clientId || !title) { showToast('Please select a client and enter a topic', 'error'); return; }
   const btn = document.getElementById('oneOffBtn'), result = document.getElementById('oneOffResult');
   btn.disabled=true; btn.innerHTML=`<span class="spinner"></span> Generating...`;
   result.innerHTML=`<div class="card"><div class="generation-progress"><div class="spinner spinner-dark" style="width:28px;height:28px;margin:0 auto;border-width:3px;"></div><p>Writing your blog — this takes about 30–60 seconds...</p></div></div>`;
+  let success = false;
   try {
     const res = await fetch(`${API}/api/generate-blog`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId,title,targetKeyword:keyword,isOneOff:true})});
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-    result.innerHTML=''; openBlogView(data.blog);
+    result.innerHTML=`<div class="alert alert-success">✅ Blog generated! Opening preview...</div>`;
+    success = true;
+    openBlogView(data.blog);
+    // Clear form fields on success
+    document.getElementById('oneOffTitle').value='';
+    document.getElementById('oneOffKeyword').value='';
   } catch(e) { result.innerHTML=`<div class="alert alert-error">❌ ${e.message}</div>`; }
-  btn.disabled=false; btn.innerHTML='✍️ Generate Blog';
+  btn.disabled=false;
+  btn.innerHTML = success ? '✍️ Generate Another' : '✍️ Generate Blog';
 }
 
 // ── CLIENT VIEW ────────────────────────────────────────────────────
@@ -455,21 +490,44 @@ async function renderTitlesTab() {
   const el=document.getElementById('clientTabContent');
   el.innerHTML=`<div style="text-align:center;padding:40px;"><div class="spinner spinner-dark" style="margin:0 auto;width:28px;height:28px;border-width:3px;"></div></div>`;
 
-  const [titles, alerts] = await Promise.all([
+  const [titles, alerts, clusters] = await Promise.all([
     fetch(`${API}/api/clients/${state.activeClient.id}/titles`).then(r=>r.json()),
-    fetch(`${API}/api/clients/${state.activeClient.id}/alerts`).then(r=>r.json())
+    fetch(`${API}/api/clients/${state.activeClient.id}/alerts`).then(r=>r.json()),
+    fetch(`${API}/api/clients/${state.activeClient.id}/clusters`).then(r=>r.json())
   ]);
 
-  const proposed=titles.filter(t=>t.status==='proposed');
-  const approved=titles.filter(t=>t.status==='approved');
-  const others=titles.filter(t=>!['proposed','approved'].includes(t.status));
+  // Build cluster lookup for pillar topic tooltips on title cards
+  state.clustersById = {};
+  (clusters || []).forEach(c => { state.clustersById[c.id] = c; });
 
-  // Build alert banner if there's pending client feedback
+  // Store full titles list for client-side filtering
+  state.allTitlesForClient = titles;
+  state.titleAlertsForClient = alerts;
+  renderTitlesTabFiltered();
+}
+
+function renderTitlesTabFiltered() {
+  const titles = state.allTitlesForClient || [];
+  const alerts = state.titleAlertsForClient || {};
+  const q = (state.titleSearchQuery || '').toLowerCase().trim();
+
+  const filtered = q
+    ? titles.filter(t => (t.title||'').toLowerCase().includes(q) || (t.target_keyword||'').toLowerCase().includes(q) || (t.schedule_slot||'').toLowerCase().includes(q))
+    : titles;
+
+  const proposed=filtered.filter(t=>t.status==='proposed');
+  const approved=filtered.filter(t=>t.status==='approved');
+  const inProgress=filtered.filter(t=>t.status==='in_progress');
+  const completed=filtered.filter(t=>t.status==='completed');
+  const rejected=filtered.filter(t=>t.status==='rejected');
+
   let alertBanner = '';
   if (alerts.total > 0) {
     const parts = [];
-    if (alerts.approvals > 0) parts.push(`<strong>${alerts.approvals}</strong> title${alerts.approvals!==1?'s':''} approved by client`);
-    if (alerts.suggestions > 0) parts.push(`<strong>${alerts.suggestions}</strong> suggestion${alerts.suggestions!==1?'s':''} waiting for review`);
+    if (alerts.titleApprovals > 0) parts.push(`<strong>${alerts.titleApprovals}</strong> title${alerts.titleApprovals!==1?'s':''} approved`);
+    if (alerts.titleSuggestions > 0) parts.push(`<strong>${alerts.titleSuggestions}</strong> title suggestion${alerts.titleSuggestions!==1?'s':''}`);
+    if (alerts.blogApprovals > 0) parts.push(`<strong>${alerts.blogApprovals}</strong> blog${alerts.blogApprovals!==1?'s':''} approved`);
+    if (alerts.blogFeedback > 0) parts.push(`<strong>${alerts.blogFeedback}</strong> blog feedback item${alerts.blogFeedback!==1?'s':''}`);
     alertBanner = `
       <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
         <div style="display:flex;align-items:center;gap:10px;">
@@ -479,16 +537,21 @@ async function renderTitlesTab() {
             <div style="font-size:12px;color:#92400E;margin-top:2px;">${parts.join(' · ')}</div>
           </div>
         </div>
-        <div style="display:flex;gap:6px;flex-shrink:0;">
-          ${alerts.approvals > 0 ? `<span style="background:var(--light-green);color:var(--green);font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;">✓ ${alerts.approvals} approved</span>` : ''}
-          ${alerts.suggestions > 0 ? `<span style="background:#FEF3C7;color:#92400E;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;">💬 ${alerts.suggestions} to review</span>` : ''}
+        <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;">
+          ${(alerts.titleApprovals + alerts.titleSuggestions) > 0 ? `<span style="background:var(--light-green);color:var(--green);font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;">📋 ${alerts.titleApprovals + alerts.titleSuggestions} title feedback</span>` : ''}
+          ${(alerts.blogApprovals + alerts.blogFeedback) > 0 ? `<span style="background:#EFF6FF;color:var(--blue);font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;">📄 ${alerts.blogApprovals + alerts.blogFeedback} blog feedback — check Blog Queue</span>` : ''}
         </div>
       </div>`;
-    // Update sidebar dot with fresh data
     if (!state.clientAlerts) state.clientAlerts = {};
-    state.clientAlerts[state.activeClient.id] = { approvals: alerts.approvals, suggestions: alerts.suggestions };
+    state.clientAlerts[state.activeClient.id] = { titleApprovals: alerts.titleApprovals, titleSuggestions: alerts.titleSuggestions, blogApprovals: alerts.blogApprovals, blogFeedback: alerts.blogFeedback };
     renderClientList();
   }
+
+  const el = document.getElementById('clientTabContent');
+  const totalTitles = titles.length;
+  const filteredTotal = filtered.length;
+  const hasSearchQuery = !!q;
+
   el.innerHTML=`
     ${alertBanner}
     <div class="card">
@@ -500,12 +563,21 @@ async function renderTitlesTab() {
       <div class="form-group"><label class="form-label">Override Target Keywords (optional)</label><input class="form-input" id="titleKeywords" placeholder="Leave blank to use client profile keywords" /></div>
       <button class="btn btn-primary" onclick="generateTitles()" id="generateTitlesBtn">🎯 Generate Titles</button>
     </div>
+
+    ${totalTitles > 5 ? `
+    <div style="margin-bottom:16px;display:flex;gap:8px;align-items:center;">
+      <div style="flex:1;position:relative;">
+        <input id="titleSearchInput" class="form-input" value="${escapeHtml(state.titleSearchQuery||'')}" placeholder="🔎 Search titles, keywords, or schedule (e.g. 'hormone', 'April 2025')..." oninput="onTitleSearchInput(this.value)" style="padding-left:14px;" />
+      </div>
+      ${hasSearchQuery ? `<button class="btn btn-secondary btn-sm" onclick="clearTitleSearch()">Clear</button>` : ''}
+      ${hasSearchQuery ? `<span style="font-size:12px;color:var(--muted);white-space:nowrap;">${filteredTotal} of ${totalTitles}</span>` : ''}
+    </div>` : ''}
     ${proposed.length?`
     <div class="card">
       <div class="card-title">Proposed Titles
         <div style="display:flex;gap:8px;align-items:center;">
           <span style="font-size:12px;color:var(--muted);font-weight:400;">${proposed.length} awaiting review</span>
-          <button class="btn btn-secondary btn-sm" onclick="shareWithClient()">🔗 Share with Client</button>
+          <button class="btn btn-secondary btn-sm" onclick="shareWithClient(this)">🔗 Share with Client</button>
         </div>
       </div>
       ${proposed.map(t=>renderTitleCard(t)).join('')}
@@ -520,29 +592,64 @@ async function renderTitlesTab() {
       </div>
       ${approved.map(t=>renderTitleCard(t)).join('')}
     </div>`:''}
-    ${others.length?`<div class="card"><div class="card-title">In Progress / Completed</div>${others.map(t=>renderTitleCard(t)).join('')}</div>`:''}
-    ${!titles.length?`<div class="card"><div class="empty-state"><div class="icon">🎯</div><div class="title">No titles yet</div><div class="desc">Generate your first batch above or create a topic cluster.</div></div></div>`:''}
+    ${inProgress.length?`<div class="card"><div class="card-title">✍️ In Progress <span style="font-size:12px;color:var(--muted);font-weight:400;">${inProgress.length} being written</span></div>${inProgress.map(t=>renderTitleCard(t)).join('')}</div>`:''}
+    ${completed.length?`<div class="card"><div class="card-title">✅ Completed <span style="font-size:12px;color:var(--muted);font-weight:400;">${completed.length} done</span></div>${completed.map(t=>renderTitleCard(t)).join('')}</div>`:''}
+    ${rejected.length?`
+    <details style="margin-bottom:16px;">
+      <summary style="cursor:pointer;padding:12px 16px;background:var(--white);border:1px solid var(--border);border-radius:10px;font-family:var(--font-ui);font-size:13px;font-weight:500;color:var(--muted);list-style:none;display:flex;align-items:center;justify-content:space-between;">
+        <span>✕ Rejected Titles (${rejected.length})</span>
+        <span style="font-size:11px;">click to expand</span>
+      </summary>
+      <div style="margin-top:8px;">${rejected.map(t=>renderTitleCard(t)).join('')}</div>
+    </details>`:''}
+    ${!filtered.length ? (hasSearchQuery
+      ? `<div class="card"><div class="empty-state"><div class="icon">🔎</div><div class="title">No titles match "${escapeHtml(q)}"</div><div class="desc">Try a different search or <a href="#" onclick="clearTitleSearch();return false;" style="color:var(--green);">clear the search</a>.</div></div></div>`
+      : (totalTitles ? '' : `<div class="card"><div class="empty-state"><div class="icon">🎯</div><div class="title">No titles yet</div><div class="desc">Generate your first batch above or create a topic cluster.</div></div></div>`)) : ''}
   `;
+
+  // Restore focus to search input if it was active
+  if (document.activeElement?.id !== 'titleSearchInput') {
+    const input = document.getElementById('titleSearchInput');
+    if (hasSearchQuery && input) {
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+  }
+}
+
+// Debounced search input handler
+let _titleSearchTimer = null;
+function onTitleSearchInput(value) {
+  state.titleSearchQuery = value;
+  clearTimeout(_titleSearchTimer);
+  _titleSearchTimer = setTimeout(() => renderTitlesTabFiltered(), 150);
+}
+
+function clearTitleSearch() {
+  state.titleSearchQuery = '';
+  renderTitlesTabFiltered();
 }
 
 function renderTitleCard(t) {
   const needsReviewFlag=t.needs_review?`<span style="display:inline-flex;align-items:center;gap:4px;background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;">⚠️ Client Suggestion</span>`:'';
   const approvedFlag=t.client_approved?`<span style="display:inline-flex;align-items:center;gap:4px;background:var(--light-green);color:var(--green);font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;">✓ Client Approved</span>`:'';
-  const clusterBadge=t.cluster_id?`<span style="display:inline-flex;align-items:center;gap:4px;background:#EFF6FF;color:var(--blue);font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;">🔗 Cluster ${t.cluster_position||''}</span>`:'';
+  // Find the pillar topic for this cluster to put in tooltip
+  const clusterPillar = t.cluster_id && state.clustersById ? state.clustersById[t.cluster_id]?.pillar_topic : null;
+  const clusterBadge=t.cluster_id?`<span title="${clusterPillar ? 'Cluster: '+escapeHtml(clusterPillar) : 'Topic cluster'}" style="display:inline-flex;align-items:center;gap:4px;background:#EFF6FF;color:var(--blue);font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;cursor:help;">🔗 ${clusterPillar ? escapeHtml(clusterPillar.length > 30 ? clusterPillar.slice(0, 30) + '…' : clusterPillar) : 'Cluster'} ${t.cluster_position?`· ${t.cluster_position}`:''}</span>`:'';
   const suggestionBlock=t.client_suggestion?`<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;padding:8px 12px;margin-top:8px;font-size:12px;line-height:1.5;"><strong style="color:#92400E;">Client note:</strong> ${escapeHtml(t.client_suggestion)}</div>`:'';
   const rewriteBtn=t.needs_review&&t.client_suggestion?`<button class="btn btn-warning btn-sm" onclick="openRewriteModal('${t.id}',\`${escapeJs(t.title)}\`,\`${escapeJs(t.client_suggestion)}\`)">✨ AI Rewrite</button>`:'';
   return `<div class="title-card" id="titleCard_${t.id}">
     <div style="flex:1;">
       ${t.schedule_slot?`<div style="font-size:11px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">${escapeHtml(t.schedule_slot)}</div>`:''}
-      <div style="font-size:14px;font-weight:500;line-height:1.4;">${escapeHtml(t.title)}</div>
-      ${t.target_keyword?`<div style="font-size:12px;color:var(--muted);margin-top:3px;">🔑 ${escapeHtml(t.target_keyword)}</div>`:''}
+      <div data-field="title" style="font-size:14px;font-weight:500;line-height:1.4;">${escapeHtml(t.title)}</div>
+      ${t.target_keyword?`<div data-field="keyword" style="font-size:12px;color:var(--muted);margin-top:3px;">🔑 ${escapeHtml(t.target_keyword)}</div>`:''}
       ${t.rationale?`<div style="font-size:12px;color:var(--muted);margin-top:4px;font-style:italic;line-height:1.4;">${escapeHtml(t.rationale)}</div>`:''}
       ${suggestionBlock}
       <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">${approvedFlag}${needsReviewFlag}${clusterBadge}</div>
     </div>
     <div class="title-actions">
       <span class="badge badge-${t.status}">${formatStatus(t.status)}</span>
-      ${t.status==='proposed'?`<button class="btn btn-secondary btn-sm" onclick="updateTitleStatus('${t.id}','approved')">✓ Approve</button><button class="btn btn-secondary btn-sm" onclick="editTitle('${t.id}')">✏️</button><button class="btn btn-danger btn-sm" onclick="updateTitleStatus('${t.id}','rejected')">✕</button>`:''}
+      ${t.status==='proposed'?`<button class="btn btn-secondary btn-sm" onclick="updateTitleStatus('${t.id}','approved')" title="Approve this title">✓ Approve</button><button class="btn btn-secondary btn-sm" onclick="editTitle('${t.id}')" title="Edit title">✏️</button><button class="btn btn-danger btn-sm" onclick="updateTitleStatus('${t.id}','rejected')" title="Reject title">✕</button>`:''}
       ${rewriteBtn}
       ${t.status==='approved'?`<button class="btn btn-primary btn-sm" onclick="openGenerateModal('${t.id}',\`${escapeJs(t.title)}\`,\`${escapeJs(t.target_keyword||'')}\`)">✍️ Write</button>`:''}
       ${t.status==='rejected'?`<button class="btn btn-secondary btn-sm" onclick="updateTitleStatus('${t.id}','proposed')">↩ Restore</button>`:''}
@@ -557,20 +664,20 @@ async function generateTitles() {
     const data=await fetch(`${API}/api/clients/${state.activeClient.id}/generate-titles`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({count:document.getElementById('titleCount').value,topicDirection:document.getElementById('topicDirection').value.trim(),targetKeywords:document.getElementById('titleKeywords').value.trim()})}).then(r=>r.json());
     if (data.error) throw new Error(data.error);
     renderTitlesTab();
-  } catch(e) { alert(`Failed: ${e.message}`); }
+  } catch(e) { showToast(`Failed: ${e.message}`, 'error'); }
   btn.disabled=false; btn.innerHTML='🎯 Generate Titles';
 }
 
-async function shareWithClient() {
-  const btn=event.target; const orig=btn.textContent;
+async function shareWithClient(btn) {
+  const orig = btn.textContent;
   btn.disabled=true; btn.textContent='Copying...';
   try {
     const data=await fetch(`${API}/api/clients/${state.activeClient.id}/share-titles`,{method:'POST'}).then(r=>r.json());
     if (data.error) throw new Error(data.error);
-    await navigator.clipboard.writeText(data.shareUrl);
-    showToast(`✅ Link copied! (${data.count} titles)`);
-  } catch(e) { alert(`Error: ${e.message}`); }
-  btn.disabled=false; btn.textContent=orig;
+    btn.disabled=false; btn.textContent=orig;
+    const copied = await copyWithFeedback(data.shareUrl, btn);
+    showToast(copied ? `✅ Link copied! (${data.count} titles)` : 'Link ready — clipboard unavailable', copied ? 'success' : 'default');
+  } catch(e) { showToast(`Error: ${e.message}`, 'error'); btn.disabled=false; btn.textContent=orig; }
 }
 
 async function updateTitleStatus(titleId,status) {
@@ -591,18 +698,22 @@ async function openRewriteModal(titleId,originalTitle,clientNote) {
     if (data.error) throw new Error(data.error);
     document.getElementById('rewriteLoading').style.display='none';
     document.getElementById('rewriteAlternatives').innerHTML=`
-      <div style="font-size:13px;color:var(--muted);margin-bottom:14px;">Pick the option that best addresses the client's feedback.</div>
-      ${(data.alternatives||[]).map((a,i)=>`
+      <div style="font-size:13px;color:var(--muted);margin-bottom:14px;">Pick the option that best addresses the client's feedback. Titles between 45–65 characters are ideal for SEO.</div>
+      ${(data.alternatives||[]).map((a,i)=>{
+        const charCount = (a.title||'').length;
+        const isOptimal = charCount >= 45 && charCount <= 65;
+        const charColor = isOptimal ? 'var(--green)' : (charCount > 65 || charCount < 30) ? 'var(--danger)' : 'var(--warning)';
+        return `
         <div style="border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:10px;background:var(--white);">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
-            <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px;">Option ${i+1}</div>
+            <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px;display:flex;align-items:center;gap:8px;">Option ${i+1}<span style="font-weight:500;color:${charColor};font-size:11px;">${charCount} chars${isOptimal ? ' · ideal' : ''}</span></div>
               <div style="font-size:15px;font-weight:600;line-height:1.4;margin-bottom:4px;">${escapeHtml(a.title)}</div>
               <div style="font-size:12px;color:var(--muted);margin-bottom:5px;">🔑 ${escapeHtml(a.targetKeyword||'')}</div>
               <div style="font-size:12px;color:var(--muted);font-style:italic;line-height:1.4;">${escapeHtml(a.rationale||'')}</div>
             </div>
             <button class="btn btn-primary btn-sm" style="flex-shrink:0;margin-top:4px;" onclick="acceptRewrite('${titleId}',\`${escapeJs(a.title)}\`,\`${escapeJs(a.targetKeyword||'')}\`,this)">Use This</button>
           </div>
-        </div>`).join('')}
+        </div>`;}).join('')}
       <div style="display:flex;justify-content:flex-end;margin-top:8px;"><button class="btn btn-secondary" onclick="closeModal('rewriteModal')">Cancel</button></div>`;
   } catch(e) { document.getElementById('rewriteLoading').style.display='none'; document.getElementById('rewriteAlternatives').innerHTML=`<div class="alert alert-error">❌ ${e.message}</div>`; }
 }
@@ -612,17 +723,18 @@ async function acceptRewrite(titleId,title,targetKeyword,btn) {
   try {
     await fetch(`${API}/api/titles/${titleId}/accept-rewrite`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,targetKeyword})});
     closeModal('rewriteModal'); showToast('✅ Title updated'); renderTitlesTab();
-  } catch(e) { btn.disabled=false; btn.textContent='Use This'; alert(`Failed: ${e.message}`); }
+  } catch(e) { btn.disabled=false; btn.textContent='Use This'; showToast(`Failed: ${e.message}`, 'error'); }
 }
 
 function editTitle(titleId) {
   const card=document.getElementById(`titleCard_${titleId}`);
-  const titleDiv=card.querySelector('div[style*="font-weight:500"]');
-  const kwDiv=card.querySelector('div[style*="color:var(--muted);margin-top:3px"]');
+  const titleDiv=card.querySelector('[data-field="title"]');
+  const kwDiv=card.querySelector('[data-field="keyword"]');
   const current=titleDiv.textContent, currentKw=kwDiv?kwDiv.textContent.replace('🔑 ',''):'';
   titleDiv.innerHTML=`<input class="form-input" id="editTitleInput_${titleId}" value="${escapeHtml(current)}" style="margin-bottom:6px;" />`;
   if (kwDiv) kwDiv.innerHTML=`<input class="form-input" id="editKwInput_${titleId}" value="${escapeHtml(currentKw)}" placeholder="Target keyword" style="font-size:12px;" />`;
   card.querySelector('.title-actions').innerHTML=`<button class="btn btn-primary btn-sm" onclick="saveEditTitle('${titleId}')">Save</button><button class="btn btn-secondary btn-sm" onclick="renderTitlesTab()">Cancel</button>`;
+  document.getElementById(`editTitleInput_${titleId}`)?.focus();
 }
 
 async function saveEditTitle(titleId) {
@@ -683,19 +795,19 @@ async function renderBlogsTab() {
       <div class="card-title">${sIcon[status]} ${formatStatus(status)} <span style="font-size:12px;color:var(--muted);font-weight:400;">${items.length} blog${items.length!==1?'s':''}</span></div>
       <div class="table-wrap"><table><thead><tr><th>Title</th><th>Keyword</th><th>Words</th><th>Type</th><th>Created</th><th>Actions</th></tr></thead><tbody>
         ${items.map(b=>`<tr>
-          <td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(b.title)}">${escapeHtml(b.title)}</td>
+          <td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(b.title)}">${escapeHtml(b.title)}${b.client_blog_approved?` <span style="font-size:10px;background:var(--light-green);color:var(--green);padding:1px 6px;border-radius:10px;font-weight:600;">✓ Client OK</span>`:''}${b.client_blog_feedback&&!b.client_blog_approved?` <span style="font-size:10px;background:#FFFBEB;color:#92400E;padding:1px 6px;border-radius:10px;font-weight:600;">💬 Feedback</span>`:''}</td>
           <td style="font-size:12px;color:var(--muted);">${b.target_keyword||'–'}</td>
           <td style="font-size:12px;color:var(--muted);">${b.word_count?b.word_count.toLocaleString():'–'}</td>
-          <td><span style="font-size:11px;color:${b.is_one_off?'var(--muted)':'var(--green)'};">${b.is_one_off?'One-Off':'From Queue'}</span></td>
+          <td><span style="font-size:11px;color:${b.is_one_off?'var(--muted)':'var(--green)'};">${b.is_one_off?'One-Off':(b.cluster_id?'🔗 Cluster':'From Queue')}</span></td>
           <td style="font-size:12px;color:var(--muted);">${formatDate(b.created_at)}</td>
           <td><div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button class="btn btn-secondary btn-sm" onclick="viewBlog('${b.id}')">View</button>
-            <button class="btn btn-secondary btn-sm" onclick="exportBlog('${b.id}')">⬇️</button>
-            ${status==='draft'?`<button class="btn btn-secondary btn-sm" onclick="moveBlogStatus('${b.id}','in-review',this)">→ Review</button>`:''}
-            ${status==='in-review'?`<button class="btn btn-primary btn-sm" onclick="moveBlogStatus('${b.id}','approved',this)">✓ Approve</button>`:''}
-            ${status==='approved'?`<button class="btn btn-primary btn-sm" onclick="openWpPushModal('${b.id}')">🚀 Push to WP</button>`:''}
-            ${status==='published'?`<button class="btn btn-secondary btn-sm" onclick="publishWpPost('${b.id}',this)">🌐 Publish Live</button>${b.wp_post_id&&state.activeClient?.wp_url?`<a href="${state.activeClient.wp_url}/wp-admin/post.php?post=${b.wp_post_id}&action=edit" target="_blank" class="btn btn-secondary btn-sm">WP ↗</a>`:''}`:''}
-            <button class="btn btn-secondary btn-sm" onclick="shareBlog('${b.id}')">🔗</button>
+            <button class="btn btn-secondary btn-sm" onclick="viewBlog('${b.id}')" title="View blog">View</button>
+            <button class="btn btn-secondary btn-sm" onclick="exportBlog('${b.id}')" title="Download as .docx">⬇️</button>
+            ${status==='draft'?`<button class="btn btn-secondary btn-sm" onclick="moveBlogStatus('${b.id}','in-review',this)" title="Move to review">→ Review</button>`:''}
+            ${status==='in-review'?`<button class="btn btn-primary btn-sm" onclick="moveBlogStatus('${b.id}','approved',this)" title="Mark as approved">✓ Approve</button>`:''}
+            ${status==='approved'?`<button class="btn btn-primary btn-sm" onclick="openWpPushModal('${b.id}')" title="Push to WordPress as draft or scheduled">🚀 Push to WP</button>`:''}
+            ${status==='published'?`<button class="btn btn-secondary btn-sm" onclick="publishWpPost('${b.id}',this)" title="Publish live on WordPress">🌐 Publish Live</button>${b.wp_post_id&&state.activeClient?.wp_url?`<a href="${state.activeClient.wp_url}/wp-admin/post.php?post=${b.wp_post_id}&action=edit" target="_blank" class="btn btn-secondary btn-sm" title="Open in WordPress admin">WP ↗</a>`:''}`:''}
+            <button class="btn btn-secondary btn-sm" onclick="shareBlog('${b.id}', this)" title="Copy client preview link">🔗</button>
           </div></td>
         </tr>`).join('')}
       </tbody></table></div>
@@ -719,16 +831,36 @@ function openBlogView(blog) {
     </div>`;
   }
   if (blog.schema_json) html+=`<div class="schema-box"><div class="schema-box-header"><span class="schema-box-label">JSON-LD Schema</span><button class="btn btn-secondary btn-sm" onclick="copySchema()" style="font-size:11px;">Copy</button></div><pre id="schemaContent">${escapeHtml(blog.schema_json)}</pre></div>`;
+
+  // Client feedback block
+  if (blog.client_blog_approved || blog.client_blog_feedback) {
+    html += `<div style="margin-top:20px;background:${blog.client_blog_approved?'var(--light-green)':'#FFFBEB'};border:1px solid ${blog.client_blog_approved?'var(--green)':'#FDE68A'};border-radius:10px;padding:14px 16px;">
+      <div style="font-size:12px;font-weight:600;color:${blog.client_blog_approved?'var(--green)':'#92400E'};text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">
+        ${blog.client_blog_approved ? '✓ Client Approved' : '💬 Client Feedback'}
+      </div>
+      ${blog.client_blog_feedback ? `<div style="font-size:13px;line-height:1.6;">${escapeHtml(blog.client_blog_feedback)}</div>` : ''}
+      ${blog.client_feedback_at ? `<div style="font-size:11px;color:var(--muted);margin-top:6px;">${formatDate(blog.client_feedback_at)}</div>` : ''}
+    </div>`;
+  }
   document.getElementById('blogViewBody').innerHTML=html;
   document.getElementById('blogViewFooter').innerHTML=`
     <span class="badge badge-${blog.status}" style="margin-right:auto;">${formatStatus(blog.status)}</span>
-    <button class="btn btn-secondary" onclick="shareBlog('${blog.id}')">🔗 Share Preview</button>
+    <button class="btn btn-secondary" onclick="shareBlog('${blog.id}', this)">🔗 Share Preview</button>
     <button class="btn btn-secondary" onclick="exportBlog('${blog.id}')">⬇️ .docx</button>
     <button class="btn btn-secondary" onclick="closeModal('blogViewModal')">Close</button>`;
   document.getElementById('blogViewModal').style.display='flex';
+  // Scroll modal body to top (fixes issue when viewing consecutive blogs)
+  document.getElementById('blogViewBody').scrollTop = 0;
+  const modalEl = document.getElementById('blogViewModal').querySelector('.modal');
+  if (modalEl) modalEl.scrollTop = 0;
 }
 
-function copySchema() { const t=document.getElementById('schemaContent')?.textContent; if(t){navigator.clipboard.writeText(t);showToast('Schema copied');} }
+function copySchema() {
+  const t=document.getElementById('schemaContent')?.textContent;
+  if (!t) return;
+  const btn = event?.target;
+  copyWithFeedback(t, btn).then(() => showToast('Schema copied', 'success'));
+}
 
 function renderBlogHtml(markdown) {
   if (!markdown) return '';
@@ -751,12 +883,12 @@ function renderBlogHtml(markdown) {
 async function moveBlogStatus(blogId,status,btn) { btn.disabled=true; await fetch(`${API}/api/blogs/${blogId}/status`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})}); renderBlogsTab(); }
 function exportBlog(blogId) { window.open(`${API}/api/blogs/${blogId}/export`,'_blank'); }
 
-async function shareBlog(blogId) {
+async function shareBlog(blogId, btn) {
   try {
     const data=await fetch(`${API}/api/blogs/${blogId}/share`,{method:'POST'}).then(r=>r.json());
-    await navigator.clipboard.writeText(data.shareUrl);
-    showToast('✅ Preview link copied!');
-  } catch(e) { alert(`Error: ${e.message}`); }
+    const copied = await copyWithFeedback(data.shareUrl, btn);
+    showToast(copied ? '✅ Preview link copied!' : 'Link ready — clipboard unavailable', copied ? 'success' : 'default');
+  } catch(e) { showToast(`Error: ${e.message}`, 'error'); }
 }
 
 // ── WP PUSH MODAL ─────────────────────────────────────────────────
@@ -808,16 +940,18 @@ function toggleCategory(id) {
 }
 
 async function createWpCategory() {
-  const name=document.getElementById('newCatInput').value.trim();
+  const input=document.getElementById('newCatInput');
+  const name=input.value.trim();
   if (!name) return;
+  input.disabled=true;
   try {
     const cat=await fetch(`${API}/api/clients/${state.activeClient.id}/wp-categories`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})}).then(r=>r.json());
     if (cat.error) throw new Error(cat.error);
     state.wpCategories.push({id:cat.id,name:cat.name,slug:cat.slug,count:0});
     state.selectedWpCategories.push(cat.id);
     renderCategoryPicker();
-    showToast(`✅ Category "${name}" created`);
-  } catch(e) { alert(`Failed: ${e.message}`); }
+    showToast(`✅ Category "${name}" created`, 'success');
+  } catch(e) { showToast(`Failed: ${e.message}`, 'error'); input.disabled=false; }
 }
 
 async function refreshCategories() {
@@ -825,7 +959,7 @@ async function refreshCategories() {
     const cats=await fetch(`${API}/api/clients/${state.activeClient.id}/wp-categories`).then(r=>r.json());
     state.wpCategories=Array.isArray(cats)?cats:[];
     renderCategoryPicker(); showToast('Categories refreshed');
-  } catch(e) { alert(`Failed: ${e.message}`); }
+  } catch(e) { showToast(`Failed: ${e.message}`, 'error'); }
 }
 
 async function executePushToWp() {
@@ -849,15 +983,16 @@ async function executePushToWp() {
 }
 
 async function publishWpPost(blogId,btn) {
-  if (!confirm('Publish this post live on WordPress?')) return;
+  const ok = await showConfirm({ title: 'Publish Live', message: 'Publish this post live on the client\'s WordPress site right now?', confirmLabel: 'Publish Live' });
+  if (!ok) return;
   btn.disabled=true; btn.textContent='Publishing...';
   try {
     const data=await fetch(`${API}/api/blogs/${blogId}/publish-wp`,{method:'POST'}).then(r=>r.json());
     if (data.error) throw new Error(data.error);
-    showToast('Published live!');
+    showToast('Published live!', 'success');
     if (data.url) window.open(data.url,'_blank');
     renderBlogsTab();
-  } catch(e) { alert(`❌ ${e.message}`);btn.disabled=false;btn.textContent='🌐 Publish Live'; }
+  } catch(e) { showToast(`❌ ${e.message}`, 'error');btn.disabled=false;btn.textContent='🌐 Publish Live'; }
 }
 
 // ── CLUSTERS TAB ───────────────────────────────────────────────────
@@ -887,7 +1022,10 @@ async function renderClustersTab() {
             ${pillar.recommendedWordCount?`<div style="font-size:12px;color:var(--muted);">Recommended pillar word count: ${pillar.recommendedWordCount.toLocaleString()}</div>`:''}
             ${pillar.sections?.length?`<div style="margin-top:8px;"><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Pillar Sections</div>${pillar.sections.map(s=>`<div style="font-size:12px;color:var(--muted);">• ${escapeHtml(s)}</div>`).join('')}</div>`:''}
           </div>
-          <span style="font-size:11px;color:var(--muted);white-space:nowrap;">${formatDate(c.created_at)}</span>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;">
+            <span style="font-size:11px;color:var(--muted);white-space:nowrap;">${formatDate(c.created_at)}</span>
+            <button class="btn btn-danger btn-sm" onclick="deleteCluster('${c.id}', ${titles.length})">🗑 Remove</button>
+          </div>
         </div>
         ${titles.length?`<div class="cluster-titles"><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Supporting Blogs</div>${titles.map(t=>`<div class="cluster-title-item"><span class="badge badge-${t.status}" style="font-size:10px;">${formatStatus(t.status)}</span> ${escapeHtml(t.title)}${t.schedule_slot?` <span style="color:var(--green);font-size:10px;">(${escapeHtml(t.schedule_slot)})</span>`:''}</div>`).join('')}</div>`:''}
       </div>`;
@@ -898,7 +1036,7 @@ async function renderClustersTab() {
 async function generateCluster() {
   const topic=document.getElementById('clusterTopic').value.trim();
   const count=document.getElementById('clusterCount').value;
-  if (!topic){alert('Please enter a pillar topic');return;}
+  if (!topic){showToast('Please enter a pillar topic', 'error');return;}
   const btn=document.getElementById('generateClusterBtn');
   btn.disabled=true; btn.innerHTML=`<span class="spinner"></span> Generating cluster...`;
   try {
@@ -906,8 +1044,51 @@ async function generateCluster() {
     if (data.error) throw new Error(data.error);
     showToast(`✅ Cluster created — ${data.supportingTitles?.length||0} titles added to queue`);
     renderClustersTab();
-  } catch(e){alert(`Failed: ${e.message}`);}
+  } catch(e){showToast(`Failed: ${e.message}`, 'error');}
   btn.disabled=false; btn.innerHTML='🔗 Generate Cluster';
+}
+
+async function deleteCluster(clusterId, titleCount) {
+  if (titleCount === 0) {
+    const ok = await showConfirm({ title: 'Remove Cluster', message: 'Remove this cluster? It has no associated titles.', confirmLabel: 'Remove', danger: true });
+    if (!ok) return;
+    await fetch(`${API}/api/clusters/${clusterId}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({deleteTitles:false})});
+    showToast('Cluster removed', 'success');
+    renderClustersTab();
+    return;
+  }
+
+  // Has titles — show dedicated modal with clear radio choice
+  document.getElementById('clusterDeleteBody').innerHTML = `
+    <p style="font-size:14px;line-height:1.6;margin-bottom:16px;">This cluster has <strong>${titleCount} title${titleCount!==1?'s':''}</strong> in the queue. Choose what to do with them:</p>
+    <label style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;margin-bottom:8px;">
+      <input type="radio" name="clusterDel" value="keep" checked style="margin-top:3px;" />
+      <div>
+        <div style="font-size:14px;font-weight:600;">Keep titles in queue</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">Remove only the cluster record. The ${titleCount} title${titleCount!==1?'s':''} stay in the Title Queue with no cluster association.</div>
+      </div>
+    </label>
+    <label style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;">
+      <input type="radio" name="clusterDel" value="all" style="margin-top:3px;" />
+      <div>
+        <div style="font-size:14px;font-weight:600;color:var(--danger);">Remove everything</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">Delete the cluster AND all ${titleCount} associated title${titleCount!==1?'s':''} from the queue. This cannot be undone.</div>
+      </div>
+    </label>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeModal('clusterDeleteModal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmClusterDelete('${clusterId}')">Remove Cluster</button>
+    </div>`;
+  document.getElementById('clusterDeleteModal').style.display = 'flex';
+}
+
+async function confirmClusterDelete(clusterId) {
+  const choice = document.querySelector('input[name="clusterDel"]:checked')?.value;
+  const deleteTitles = choice === 'all';
+  closeModal('clusterDeleteModal');
+  await fetch(`${API}/api/clusters/${clusterId}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({deleteTitles})});
+  showToast(deleteTitles ? 'Cluster and titles removed' : 'Cluster removed (titles kept)', 'success');
+  renderClustersTab();
 }
 
 // ── PROFILE & SETTINGS TAB ─────────────────────────────────────────
@@ -1010,14 +1191,15 @@ async function addRule() {
 }
 
 async function deleteRule(ruleId) {
-  if (!confirm('Remove this rule?')) return;
+  const ok = await showConfirm({ title: 'Remove Brand Rule', message: 'Remove this rule from the client profile?', confirmLabel: 'Remove', danger: true });
+  if (!ok) return;
   await fetch(`${API}/api/clients/${state.activeClient.id}/rules/${ruleId}`,{method:'DELETE'});
   renderProfileTab();
 }
 
 async function uploadSitemap() {
   const file=document.getElementById('sitemapFile').files[0];
-  if (!file){alert('Please select a file');return;}
+  if (!file){showToast('Please select a file', 'error');return;}
   const result=document.getElementById('sitemapResult');
   result.innerHTML=`<div class="alert alert-info">Processing...</div>`;
   const form=new FormData(); form.append('sitemap',file);
@@ -1037,6 +1219,7 @@ async function testWpConnection() {
 // ── CLIENT MODAL ───────────────────────────────────────────────────
 function openClientModal(clientId=null) {
   state.editingClientId=clientId;
+  const archiveWrap = document.getElementById('archiveBtnWrap');
   if (clientId) {
     const c=state.allClients.find(x=>x.id===clientId);
     document.getElementById('clientModalTitle').textContent='Edit Client';
@@ -1046,52 +1229,113 @@ function openClientModal(clientId=null) {
     document.getElementById('clientWpUrl').value=c.wp_url||'';
     document.getElementById('clientWpUser').value=c.wp_username||'';
     document.getElementById('clientWpPass').value='';
+    // Show archive/unarchive button
+    if (c.archived) {
+      archiveWrap.innerHTML = `<button class="btn btn-secondary" onclick="toggleArchive('${c.id}', false)">↩ Unarchive Client</button>`;
+    } else {
+      archiveWrap.innerHTML = `<button class="btn btn-danger" onclick="toggleArchive('${c.id}', true)">Archive Client</button>`;
+    }
   } else {
     document.getElementById('clientModalTitle').textContent='New Client';
     ['clientName','clientWpUrl','clientWpUser','clientWpPass','clientAE'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('clientVertical').value='';
+    archiveWrap.innerHTML = '';
   }
   document.getElementById('clientModal').style.display='flex';
 }
 
+async function toggleArchive(clientId, archive) {
+  const ok = await showConfirm({
+    title: archive ? 'Archive Client' : 'Unarchive Client',
+    message: archive
+      ? 'This client will be hidden from the sidebar. All their data is preserved and can be restored anytime.'
+      : 'This client will be restored to the active list.',
+    confirmLabel: archive ? 'Archive' : 'Unarchive',
+    danger: archive
+  });
+  if (!ok) return;
+  await fetch(`${API}/api/clients/${clientId}/archive`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ archived: archive }) });
+  closeModal('clientModal');
+  if (state.activeClient?.id === clientId) { state.activeClient = null; setView('dashboard'); }
+  await loadClients(state.showArchived);
+  showToast(archive ? 'Client archived' : 'Client unarchived', 'success');
+}
+
 async function saveClient() {
-  const btn=document.getElementById('saveClientBtn');
-  const payload={name:document.getElementById('clientName').value.trim(),vertical:document.getElementById('clientVertical').value,wp_url:document.getElementById('clientWpUrl').value.trim(),wp_username:document.getElementById('clientWpUser').value.trim(),assigned_ae:document.getElementById('clientAE').value.trim()};
-  const pass=document.getElementById('clientWpPass').value.trim();
-  if (pass) payload.wp_app_password=pass;
-  if (!payload.name){alert('Client name is required');return;}
-  btn.disabled=true;
+  const btn = document.getElementById('saveClientBtn');
+  const payload = { name: document.getElementById('clientName').value.trim(), vertical: document.getElementById('clientVertical').value, wp_url: document.getElementById('clientWpUrl').value.trim(), wp_username: document.getElementById('clientWpUser').value.trim(), assigned_ae: document.getElementById('clientAE').value.trim() };
+  const pass = document.getElementById('clientWpPass').value.trim();
+  if (pass) payload.wp_app_password = pass;
+  if (!payload.name) { showToast('Client name is required', 'error'); return; }
+  btn.disabled = true;
   try {
-    const url=state.editingClientId?`${API}/api/clients/${state.editingClientId}`:`${API}/api/clients`;
-    const saved=await fetch(url,{method:state.editingClientId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(r=>r.json());
+    const url = state.editingClientId ? `${API}/api/clients/${state.editingClientId}` : `${API}/api/clients`;
+    const method = state.editingClientId ? 'PUT' : 'POST';
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const data = await res.json();
+
+    // Handle duplicate detection
+    if (res.status === 409 && data.duplicate) {
+      btn.disabled = false;
+      if (confirm(`A client named "${data.existing.name}" already exists.\n\nCreate a new client with the same name anyway?`)) {
+        payload.force = true;
+        const res2 = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const saved = await res2.json();
+        closeModal('clientModal'); await loadClients();
+        if (!state.editingClientId) selectClient(saved.id);
+      }
+      return;
+    }
+
+    if (data.error) throw new Error(data.error);
     closeModal('clientModal'); await loadClients();
-    if (!state.editingClientId) selectClient(saved.id);
-  } catch{alert('Failed to save client');}
-  btn.disabled=false;
+    if (!state.editingClientId) selectClient(data.id);
+  } catch(e) { showToast(`Failed to save: ${e.message}`, 'error'); }
+  btn.disabled = false;
 }
 
 // ── BATCH GENERATION ──────────────────────────────────────────────
 async function startBatchGenerate(titleIds) {
   if (!titleIds?.length) return;
-  if (!confirm(`Generate ${titleIds.length} blog${titleIds.length>1?'s':''} in the background?`)) return;
+  const ok = await showConfirm({
+    title: 'Batch Generate Blogs',
+    message: `Generate ${titleIds.length} blog${titleIds.length>1?'s':''} in the background? You can navigate anywhere in the app while this runs — a progress bar will track status.`,
+    confirmLabel: `Generate ${titleIds.length}`
+  });
+  if (!ok) return;
   try {
     const data=await fetch(`${API}/api/clients/${state.activeClient.id}/batch-generate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({titleIds})}).then(r=>r.json());
     if (data.error) throw new Error(data.error);
     state.batchJobId=data.jobId;
     showBatchProgress(0,data.total,0);
     state.batchPollInterval=setInterval(()=>pollBatchJob(),8000);
-  } catch(e){alert(`Failed: ${e.message}`);}
+  } catch(e){showToast(`Failed: ${e.message}`, 'error');}
 }
 
 async function pollBatchJob() {
   if (!state.batchJobId){clearInterval(state.batchPollInterval);return;}
   try {
-    const job=await fetch(`${API}/api/batch-status/${state.batchJobId}`).then(r=>r.json());
+    const res = await fetch(`${API}/api/batch-status/${state.batchJobId}`);
+    if (res.status === 404) {
+      // Job expired — likely server restart
+      clearInterval(state.batchPollInterval);
+      state.batchJobId = null;
+      hideBatchProgress();
+      showToast('Batch job was interrupted — check the blog queue for any completed work', 'error');
+      if (state.clientTab === 'blogs') renderBlogsTab();
+      return;
+    }
+    const job = await res.json();
     if (job.error){clearInterval(state.batchPollInterval);hideBatchProgress();return;}
     showBatchProgress(job.completed,job.total,job.failed);
     if (job.status==='done') {
       clearInterval(state.batchPollInterval); state.batchJobId=null;
-      setTimeout(()=>{hideBatchProgress();showToast(`✅ ${job.completed} blog${job.completed!==1?'s':''} generated!${job.failed?` (${job.failed} failed)`:''}`);if(state.clientTab==='blogs')renderBlogsTab();if(state.clientTab==='titles')renderTitlesTab();},1500);
+      setTimeout(()=>{
+        hideBatchProgress();
+        showToast(`✅ ${job.completed} blog${job.completed!==1?'s':''} generated!${job.failed?` (${job.failed} failed)`:''}`, 'success');
+        if(state.clientTab==='blogs')renderBlogsTab();
+        if(state.clientTab==='titles')renderTitlesTab();
+      },1500);
     }
   } catch(e){console.error(e);}
 }
@@ -1105,13 +1349,72 @@ function showBatchProgress(completed,total,failed) {
 
 function hideBatchProgress(){const b=document.getElementById('batchProgressBar');if(b)b.remove();}
 
+// Navigate to the right client + tab when an activity item is clicked
+function openActivityItem(clientId, type) {
+  const client = state.allClients.find(c => c.id === clientId);
+  if (!client) { showToast('Client not found', 'error'); return; }
+  state.activeClient = client;
+  state.activeView = 'client';
+  // Blog feedback → Blog Queue tab, Title feedback → Title Queue
+  state.clientTab = type === 'blog' ? 'blogs' : 'titles';
+  renderClientList();
+  renderView();
+}
+
 // ── UTILS ──────────────────────────────────────────────────────────
 function closeModal(id){document.getElementById(id).style.display='none';}
 function formatStatus(s){return{proposed:'Proposed',approved:'Approved',rejected:'Rejected',in_progress:'In Progress',draft:'Draft','in-review':'In Review',published:'Published'}[s]||s;}
 function formatDate(iso){if(!iso)return'–';return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
 function escapeHtml(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function escapeJs(s){if(!s)return'';return String(s).replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/\$/g,'\\$');}
-function showToast(msg){const t=document.createElement('div');t.style.cssText='position:fixed;bottom:24px;right:24px;background:var(--dark);color:white;padding:10px 18px;border-radius:8px;font-size:13px;z-index:9999;font-family:var(--font-ui);box-shadow:0 4px 20px rgba(0,0,0,0.2);';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2800);}
+function showToast(msg,type='default'){
+  const t=document.createElement('div');
+  const bg=type==='success'?'var(--green)':type==='error'?'var(--danger)':'var(--dark)';
+  t.style.cssText=`position:fixed;bottom:24px;right:24px;background:${bg};color:white;padding:10px 18px;border-radius:8px;font-size:13px;z-index:9999;font-family:var(--font-ui);box-shadow:0 4px 20px rgba(0,0,0,0.2);max-width:340px;`;
+  t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2800);
+}
+
+// Custom confirm modal that returns a promise — replaces native confirm()
+let _confirmResolver=null;
+function showConfirm({ title='Confirm', message='', confirmLabel='Confirm', cancelLabel='Cancel', danger=false }={}){
+  document.getElementById('confirmTitle').textContent=title;
+  document.getElementById('confirmBody').innerHTML=`<div style="font-size:14px;line-height:1.6;">${message}</div>`;
+  const okBtn=document.getElementById('confirmOkBtn');
+  okBtn.textContent=confirmLabel;
+  okBtn.className=danger?'btn btn-danger':'btn btn-primary';
+  document.getElementById('confirmCancelBtn').textContent=cancelLabel;
+  document.getElementById('confirmModal').style.display='flex';
+  return new Promise(resolve=>{ _confirmResolver=resolve; });
+}
+function resolveConfirm(result){
+  closeModal('confirmModal');
+  if (_confirmResolver) { _confirmResolver(result); _confirmResolver=null; }
+}
+
+// Copy-to-clipboard with tactile button feedback
+async function copyWithFeedback(text, btn) {
+  try {
+    await navigator.clipboard.writeText(text);
+    if (btn) {
+      const orig = btn.textContent;
+      btn.textContent = '✓ Copied';
+      setTimeout(() => { btn.textContent = orig; }, 1400);
+    }
+    return true;
+  } catch { return false; }
+}
+
+// Dismiss modals on Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const openModals = document.querySelectorAll('.modal-overlay[style*="flex"]');
+  if (!openModals.length) return;
+  // Only close the topmost (last-rendered) modal
+  const top = openModals[openModals.length - 1];
+  // Special-case: confirm modal resolves to false; others just close
+  if (top.id === 'confirmModal') { resolveConfirm(false); return; }
+  top.style.display = 'none';
+});
 
 init();
 </script>
