@@ -250,6 +250,23 @@
   </div>
 </div>
 
+<!-- REVISE BLOG MODAL -->
+<div class="modal-overlay" id="reviseModal" style="display:none;">
+  <div class="modal modal-lg">
+    <div class="modal-header"><span class="modal-title">Revise Blog</span><button class="modal-close" onclick="closeModal('reviseModal')">✕</button></div>
+    <div class="modal-body" id="reviseModalBody"></div>
+  </div>
+</div>
+
+<!-- VERSION VIEW MODAL -->
+<div class="modal-overlay" id="versionModal" style="display:none;">
+  <div class="modal modal-lg">
+    <div class="modal-header"><span class="modal-title" id="versionModalTitle">Version</span><button class="modal-close" onclick="closeModal('versionModal')">✕</button></div>
+    <div class="modal-body" id="versionModalBody"></div>
+    <div class="modal-footer" id="versionModalFooter"></div>
+  </div>
+</div>
+
 <!-- REWRITE MODAL -->
 <div class="modal-overlay" id="rewriteModal" style="display:none;">
   <div class="modal modal-lg">
@@ -794,8 +811,15 @@ async function renderBlogsTab() {
     <div class="card">
       <div class="card-title">${sIcon[status]} ${formatStatus(status)} <span style="font-size:12px;color:var(--muted);font-weight:400;">${items.length} blog${items.length!==1?'s':''}</span></div>
       <div class="table-wrap"><table><thead><tr><th>Title</th><th>Keyword</th><th>Words</th><th>Type</th><th>Created</th><th>Actions</th></tr></thead><tbody>
-        ${items.map(b=>`<tr>
-          <td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(b.title)}">${escapeHtml(b.title)}${b.client_blog_approved?` <span style="font-size:10px;background:var(--light-green);color:var(--green);padding:1px 6px;border-radius:10px;font-weight:600;">✓ Client OK</span>`:''}${b.client_blog_feedback&&!b.client_blog_approved?` <span style="font-size:10px;background:#FFFBEB;color:#92400E;padding:1px 6px;border-radius:10px;font-weight:600;">💬 Feedback</span>`:''}</td>
+        ${items.map(b=>{
+          const hasFeedback = b.client_blog_feedback && !b.client_blog_approved;
+          const rowStyle = hasFeedback ? 'background:#FFFDF5;' : '';
+          return `<tr style="${rowStyle}">
+          <td style="font-weight:500;max-width:200px;" title="${escapeHtml(b.title)}">
+            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(b.title)}</div>
+            ${b.client_blog_approved?`<span style="font-size:10px;background:var(--light-green);color:var(--green);padding:1px 6px;border-radius:10px;font-weight:600;">✓ Client OK</span>`:''}
+            ${hasFeedback?`<div style="font-size:11px;margin-top:4px;padding:5px 8px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:5px;color:#92400E;line-height:1.4;white-space:normal;max-width:240px;">💬 ${escapeHtml(b.client_blog_feedback.length > 80 ? b.client_blog_feedback.slice(0,80)+'…' : b.client_blog_feedback)}</div>`:''}
+          </td>
           <td style="font-size:12px;color:var(--muted);">${b.target_keyword||'–'}</td>
           <td style="font-size:12px;color:var(--muted);">${b.word_count?b.word_count.toLocaleString():'–'}</td>
           <td><span style="font-size:11px;color:${b.is_one_off?'var(--muted)':'var(--green)'};">${b.is_one_off?'One-Off':(b.cluster_id?'🔗 Cluster':'From Queue')}</span></td>
@@ -803,13 +827,15 @@ async function renderBlogsTab() {
           <td><div style="display:flex;gap:6px;flex-wrap:wrap;">
             <button class="btn btn-secondary btn-sm" onclick="viewBlog('${b.id}')" title="View blog">View</button>
             <button class="btn btn-secondary btn-sm" onclick="exportBlog('${b.id}')" title="Download as .docx">⬇️</button>
+            ${hasFeedback?`<button class="btn btn-warning btn-sm" onclick="openReviseModal('${b.id}')" title="Revise blog based on client feedback">✏️ Revise</button>`:''}
             ${status==='draft'?`<button class="btn btn-secondary btn-sm" onclick="moveBlogStatus('${b.id}','in-review',this)" title="Move to review">→ Review</button>`:''}
             ${status==='in-review'?`<button class="btn btn-primary btn-sm" onclick="moveBlogStatus('${b.id}','approved',this)" title="Mark as approved">✓ Approve</button>`:''}
             ${status==='approved'?`<button class="btn btn-primary btn-sm" onclick="openWpPushModal('${b.id}')" title="Push to WordPress as draft or scheduled">🚀 Push to WP</button>`:''}
             ${status==='published'?`<button class="btn btn-secondary btn-sm" onclick="publishWpPost('${b.id}',this)" title="Publish live on WordPress">🌐 Publish Live</button>${b.wp_post_id&&state.activeClient?.wp_url?`<a href="${state.activeClient.wp_url}/wp-admin/post.php?post=${b.wp_post_id}&action=edit" target="_blank" class="btn btn-secondary btn-sm" title="Open in WordPress admin">WP ↗</a>`:''}`:''}
             <button class="btn btn-secondary btn-sm" onclick="shareBlog('${b.id}', this)" title="Copy client preview link">🔗</button>
           </div></td>
-        </tr>`).join('')}
+        </tr>`;}
+        ).join('')}
       </tbody></table></div>
     </div>`).join('');
 }
@@ -842,17 +868,88 @@ function openBlogView(blog) {
       ${blog.client_feedback_at ? `<div style="font-size:11px;color:var(--muted);margin-top:6px;">${formatDate(blog.client_feedback_at)}</div>` : ''}
     </div>`;
   }
+
+  // Version history section
+  html += `<div class="meta-box" style="margin-top:20px;">
+    <div class="meta-box-title" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="document.getElementById('blogVersionHistory').style.display=document.getElementById('blogVersionHistory').style.display==='none'?'block':'none';this.querySelector('.toggle').textContent=document.getElementById('blogVersionHistory').style.display==='none'?'▸':'▾';">
+      <span>Version History</span>
+      <span class="toggle" style="font-size:10px;">▸</span>
+    </div>
+    <div id="blogVersionHistory" style="display:none;">
+      <div style="font-size:12px;color:var(--muted);padding:8px 0;">Loading...</div>
+    </div>
+  </div>`;
   document.getElementById('blogViewBody').innerHTML=html;
+
+  // Load version history
+  loadVersionHistory(blog.id);
+
+  const hasFeedback = blog.client_blog_feedback && !blog.client_blog_approved;
   document.getElementById('blogViewFooter').innerHTML=`
     <span class="badge badge-${blog.status}" style="margin-right:auto;">${formatStatus(blog.status)}</span>
+    ${hasFeedback?`<button class="btn btn-warning" onclick="closeModal('blogViewModal');openReviseModal('${blog.id}')">✏️ Revise</button>`:''}
     <button class="btn btn-secondary" onclick="shareBlog('${blog.id}', this)">🔗 Share Preview</button>
     <button class="btn btn-secondary" onclick="exportBlog('${blog.id}')">⬇️ .docx</button>
     <button class="btn btn-secondary" onclick="closeModal('blogViewModal')">Close</button>`;
   document.getElementById('blogViewModal').style.display='flex';
-  // Scroll modal body to top (fixes issue when viewing consecutive blogs)
-  document.getElementById('blogViewBody').scrollTop = 0;
   const modalEl = document.getElementById('blogViewModal').querySelector('.modal');
   if (modalEl) modalEl.scrollTop = 0;
+}
+
+async function loadVersionHistory(blogId) {
+  const container = document.getElementById('blogVersionHistory');
+  if (!container) return;
+  try {
+    const versions = await fetch(`${API}/api/blogs/${blogId}/versions`).then(r=>r.json());
+    if (!versions.length) { container.innerHTML='<div style="font-size:12px;color:var(--muted);padding:8px 0;">No previous versions.</div>'; return; }
+    container.innerHTML = versions.map(v => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+        <div>
+          <div style="font-size:13px;font-weight:500;">Version ${v.version_number}</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.4;">${escapeHtml(v.revision_reason ? (v.revision_reason.length > 100 ? v.revision_reason.slice(0,100)+'…' : v.revision_reason) : 'No reason recorded')}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${formatDate(v.created_at)}${v.word_count ? ' · '+v.word_count.toLocaleString()+' words' : ''}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button class="btn btn-secondary btn-sm" onclick="viewVersion('${v.id}', ${v.version_number})">View</button>
+          <button class="btn btn-secondary btn-sm" onclick="restoreVersion('${blogId}', '${v.id}', ${v.version_number})">Restore</button>
+        </div>
+      </div>
+    `).join('');
+  } catch { container.innerHTML='<div style="font-size:12px;color:var(--muted);">Could not load version history.</div>'; }
+}
+
+async function viewVersion(versionId, versionNum) {
+  try {
+    const v = await fetch(`${API}/api/blog-versions/${versionId}`).then(r=>r.json());
+    document.getElementById('versionModalTitle').textContent = `Version ${versionNum}`;
+    let html = `<div class="blog-preview">${renderBlogHtml(v.content)}</div>`;
+    if (v.faq_json?.length) html+=`<div class="meta-box"><div class="meta-box-title">FAQ</div><div class="faq-preview">${v.faq_json.map(f=>`<div class="faq-item"><div class="faq-q">${escapeHtml(f.question)}</div><div class="faq-a">${escapeHtml(f.answer)}</div></div>`).join('')}</div></div>`;
+    if (v.title_tag||v.meta_description) html+=`<div class="meta-box"><div class="meta-box-title">SEO Metadata</div>${v.title_tag?`<div class="meta-field"><span class="meta-field-label">Title Tag</span><span class="meta-field-value">${escapeHtml(v.title_tag)}</span></div>`:''}${v.meta_description?`<div class="meta-field"><span class="meta-field-label">Meta Description</span><span class="meta-field-value">${escapeHtml(v.meta_description)}</span></div>`:''}${v.slug?`<div class="meta-field"><span class="meta-field-label">Slug</span><span class="meta-field-value">/${escapeHtml(v.slug)}</span></div>`:''}</div>`;
+    if (v.revision_reason) html+=`<div class="alert alert-warning" style="margin-top:16px;"><strong>Reason this version was archived:</strong> ${escapeHtml(v.revision_reason)}</div>`;
+    document.getElementById('versionModalBody').innerHTML = html;
+    document.getElementById('versionModalFooter').innerHTML = `<button class="btn btn-secondary" onclick="closeModal('versionModal')">Close</button>`;
+    document.getElementById('versionModal').style.display = 'flex';
+  } catch(e) { showToast(`Failed to load version: ${e.message}`, 'error'); }
+}
+
+async function restoreVersion(blogId, versionId, versionNum) {
+  const ok = await showConfirm({
+    title: 'Restore Version',
+    message: `Restore version ${versionNum}? The current content will be saved as a new version before reverting.`,
+    confirmLabel: 'Restore'
+  });
+  if (!ok) return;
+  try {
+    const data = await fetch(`${API}/api/blogs/${blogId}/restore-version/${versionId}`, { method: 'POST' }).then(r=>r.json());
+    if (data.error) throw new Error(data.error);
+    showToast(`Restored to version ${versionNum}`, 'success');
+    closeModal('versionModal');
+    closeModal('blogViewModal');
+    // Refresh the blog view with restored content
+    const blog = await fetch(`${API}/api/blogs/${blogId}`).then(r=>r.json());
+    openBlogView(blog);
+    if (state.clientTab === 'blogs') renderBlogsTab();
+  } catch(e) { showToast(`Failed: ${e.message}`, 'error'); }
 }
 
 function copySchema() {
@@ -1348,6 +1445,109 @@ function showBatchProgress(completed,total,failed) {
 }
 
 function hideBatchProgress(){const b=document.getElementById('batchProgressBar');if(b)b.remove();}
+
+// ── REVISE BLOG ────────────────────────────────────────────────────
+async function openReviseModal(blogId) {
+  const body = document.getElementById('reviseModalBody');
+  body.innerHTML = `<div style="text-align:center;padding:40px;"><div class="spinner spinner-dark" style="margin:0 auto;width:28px;height:28px;border-width:3px;"></div></div>`;
+  document.getElementById('reviseModal').style.display = 'flex';
+
+  try {
+    const blog = await fetch(`${API}/api/blogs/${blogId}`).then(r=>r.json());
+    const feedback = blog.client_blog_feedback || '';
+
+    body.innerHTML = `
+      <div style="margin-bottom:20px;">
+        <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;">Blog Being Revised</div>
+        <div style="font-size:15px;font-weight:600;">${escapeHtml(blog.title)}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">${blog.word_count ? blog.word_count.toLocaleString() + ' words' : ''} ${blog.target_keyword ? '· 🔑 '+escapeHtml(blog.target_keyword) : ''}</div>
+      </div>
+
+      ${feedback ? `
+      <div class="alert alert-warning" style="margin-bottom:20px;">
+        <div><strong>Client Feedback:</strong></div>
+        <div style="margin-top:4px;">${escapeHtml(feedback)}</div>
+      </div>` : ''}
+
+      <div class="form-group">
+        <label class="form-label">Revision Mode</label>
+        <div style="display:flex;gap:8px;">
+          <label style="flex:1;display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:2px solid var(--green);border-radius:8px;cursor:pointer;background:var(--light-green);">
+            <input type="radio" name="reviseMode" value="targeted" checked style="margin-top:3px;" onchange="updateReviseMode()" />
+            <div>
+              <div style="font-size:13px;font-weight:600;">Targeted Edit</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px;">Only changes what the feedback asks for. Preserves all other content word-for-word. Best for specific requests like FAQ changes, paragraph edits, or additions.</div>
+            </div>
+          </label>
+          <label style="flex:1;display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:2px solid var(--border);border-radius:8px;cursor:pointer;" id="fullRewriteLabel">
+            <input type="radio" name="reviseMode" value="full" style="margin-top:3px;" onchange="updateReviseMode()" />
+            <div>
+              <div style="font-size:13px;font-weight:600;">Full Rewrite</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px;">Regenerates the entire blog with the feedback incorporated. Use only when the client wants a fundamentally different direction.</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Additional Instructions (optional)</label>
+        <textarea class="form-textarea" id="reviseInstructions" rows="3" placeholder="Add any internal notes on how to handle this revision. These are team-only and won't be seen by the client.">${escapeHtml(feedback)}</textarea>
+        <p class="form-hint">Pre-filled with client feedback. Add to or edit as needed — this is what Claude will use to make changes.</p>
+      </div>
+
+      <div class="alert alert-info" style="margin-bottom:16px;">
+        <strong>Version safety:</strong> The current blog content will be saved as a version snapshot before any changes are made. You can always view or restore previous versions from the blog view.
+      </div>
+
+      <div id="reviseResult"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn btn-secondary" onclick="closeModal('reviseModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="executeRevision('${blogId}')" id="reviseBtn">✏️ Revise Blog</button>
+      </div>`;
+  } catch(e) { body.innerHTML = `<div class="alert alert-error">❌ Failed to load blog: ${e.message}</div>`; }
+}
+
+function updateReviseMode() {
+  const mode = document.querySelector('input[name="reviseMode"]:checked')?.value;
+  const labels = document.querySelectorAll('input[name="reviseMode"]');
+  labels.forEach(input => {
+    const label = input.closest('label');
+    label.style.borderColor = input.checked ? 'var(--green)' : 'var(--border)';
+    label.style.background = input.checked ? (input.value === 'full' ? '#FEF2F2' : 'var(--light-green)') : '';
+  });
+}
+
+async function executeRevision(blogId) {
+  const mode = document.querySelector('input[name="reviseMode"]:checked')?.value || 'targeted';
+  const additionalInstructions = document.getElementById('reviseInstructions')?.value.trim();
+  const btn = document.getElementById('reviseBtn');
+  const result = document.getElementById('reviseResult');
+
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> ${mode === 'full' ? 'Rewriting' : 'Revising'}...`;
+  result.innerHTML = `<div class="generation-progress"><div class="spinner spinner-dark" style="width:28px;height:28px;margin:0 auto;border-width:3px;"></div><p>${mode === 'full' ? 'Rewriting the full blog' : 'Making targeted edits'} — this takes about 30–60 seconds...</p></div>`;
+
+  try {
+    const res = await fetch(`${API}/api/blogs/${blogId}/revise`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode, additionalInstructions })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    result.innerHTML = `<div class="alert alert-success">✅ Blog revised! Version ${data.versionSaved} saved to history.</div>`;
+    btn.textContent = 'View Revised Blog';
+    btn.disabled = false;
+    btn.onclick = () => { closeModal('reviseModal'); openBlogView(data.blog); };
+    if (state.clientTab === 'blogs') renderBlogsTab();
+  } catch(e) {
+    result.innerHTML = `<div class="alert alert-error">❌ ${e.message}</div>`;
+    btn.disabled = false;
+    btn.innerHTML = '✏️ Try Again';
+    btn.onclick = () => executeRevision(blogId);
+  }
+}
 
 // Navigate to the right client + tab when an activity item is clicked
 function openActivityItem(clientId, type) {

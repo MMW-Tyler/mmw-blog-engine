@@ -10,7 +10,7 @@ const {
   Document, Packer, Paragraph, TextRun, HeadingLevel,
   AlignmentType, LevelFormat
 } = require('docx');
-const { buildBlogPrompt, buildTitlePrompt, buildTitleRewritePrompt, buildClusterPrompt } = require('./prompts');
+const { buildBlogPrompt, buildTitlePrompt, buildTitleRewritePrompt, buildClusterPrompt, buildBlogRevisionPrompt } = require('./prompts');
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -873,6 +873,171 @@ app.put('/api/blogs/:blogId/status', async (req, res) => {
   const { data, error } = await supabase.from('blogs').update({ status }).eq('id', req.params.blogId).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
+});
+
+// ─── BLOG REVISION ───────────────────────────────────────────────────────────
+
+// Helper to parse Claude's output into structured blog parts
+function parseBlogOutput(rawContent) {
+  let faqJson = null;
+  const faqMatch = rawContent.match(/---FAQ---([\s\S]*?)---END FAQ---/);
+  if (faqMatch) {
+    const lines = faqMatch[1].trim().split('\n');
+    const faqs = []; let currentQ = null;
+    for (const line of lines) {
+      const qm = line.match(/^Q\d*:\s*(.+)/), am = line.match(/^A\d*:\s*(.+)/);
+      if (qm) currentQ = qm[1].trim();
+      else if (am && currentQ) { faqs.push({ question: currentQ, answer: am[1].trim() }); currentQ = null; }
+    }
+    if (faqs.length) faqJson = faqs;
+  }
+
+  let schemaJson = null;
+  const schemaMatch = rawContent.match(/---SCHEMA---([\s\S]*?)---END SCHEMA---/);
+  if (schemaMatch) schemaJson = schemaMatch[1].trim();
+
+  const metaMatch = rawContent.match(/---SEO METADATA---([\s\S]*?)---END METADATA---/);
+  let metadata = {};
+  if (metaMatch) {
+    const mt = metaMatch[1];
+    metadata.titleTag = (mt.match(/Title Tag:\s*(.+)/) || [])[1]?.trim();
+    metadata.metaDescription = (mt.match(/Meta Description:\s*(.+)/) || [])[1]?.trim();
+    metadata.slug = (mt.match(/Slug:\s*(.+)/) || [])[1]?.trim();
+    metadata.targetKeyword = (mt.match(/Target Keyword:\s*(.+)/) || [])[1]?.trim();
+    metadata.wordCount = (mt.match(/Word Count:\s*(\d+)/) || [])[1]?.trim();
+    metadata.internalLinksUsed = (mt.match(/Internal Links Used:\s*([\s\S]+)/) || [])[1]?.trim();
+  }
+
+  const cleanContent = rawContent
+    .replace(/---FAQ---[\s\S]*?---END FAQ---/, '')
+    .replace(/---SEO METADATA---[\s\S]*?---END METADATA---/, '')
+    .replace(/---SCHEMA---[\s\S]*?---END SCHEMA---/, '')
+    .trim();
+
+  return { cleanContent, faqJson, schemaJson, metadata };
+}
+
+app.post('/api/blogs/:blogId/revise', async (req, res) => {
+  const { mode = 'targeted', additionalInstructions } = req.body;
+  if (!['targeted', 'full'].includes(mode)) return res.status(400).json({ error: 'Invalid mode' });
+
+  // Load existing blog
+  const { data: blog, error: blogErr } = await supabase.from('blogs').select('*').eq('id', req.params.blogId).single();
+  if (blogErr || !blog) return res.status(404).json({ error: 'Blog not found' });
+  if (!blog.client_blog_feedback && !additionalInstructions) return res.status(400).json({ error: 'No feedback to address' });
+
+  // Load brand rules
+  const { data: rulesData } = await supabase.from('brand_rules').select('rule').eq('client_id', blog.client_id).order('created_at');
+  const brandRules = (rulesData || []).map(r => r.rule);
+
+  // Save current version to history before making changes
+  const { data: lastVersion } = await supabase.from('blog_versions')
+    .select('version_number')
+    .eq('blog_id', blog.id)
+    .order('version_number', { ascending: false })
+    .limit(1);
+  const nextVersion = (lastVersion && lastVersion.length > 0) ? lastVersion[0].version_number + 1 : 1;
+
+  await supabase.from('blog_versions').insert({
+    blog_id: blog.id,
+    version_number: nextVersion,
+    content: blog.content,
+    title_tag: blog.title_tag,
+    meta_description: blog.meta_description,
+    slug: blog.slug,
+    faq_json: blog.faq_json,
+    schema_json: blog.schema_json,
+    word_count: blog.word_count,
+    revision_reason: blog.client_blog_feedback || additionalInstructions || 'Manual revision'
+  });
+
+  // Build revision prompt
+  const prompt = buildBlogRevisionPrompt({
+    existingContent: blog.content,
+    existingFaqJson: blog.faq_json,
+    existingTitleTag: blog.title_tag,
+    existingMetaDescription: blog.meta_description,
+    existingSlug: blog.slug,
+    clientFeedback: blog.client_blog_feedback || '',
+    additionalInstructions,
+    brandRules,
+    mode
+  });
+
+  try {
+    const message = await anthropic.messages.create({ model: CLAUDE_MODEL, max_tokens: 8000, messages: [{ role: 'user', content: prompt }] });
+    const rawContent = message.content[0].text;
+    const { cleanContent, faqJson, schemaJson, metadata } = parseBlogOutput(rawContent);
+
+    // Update blog with revised content and clear client feedback
+    const { data: updated, error: updateErr } = await supabase.from('blogs').update({
+      content: cleanContent,
+      title_tag: metadata.titleTag || blog.title_tag,
+      meta_description: metadata.metaDescription || blog.meta_description,
+      slug: metadata.slug || blog.slug,
+      faq_json: faqJson || blog.faq_json,
+      schema_json: schemaJson || blog.schema_json,
+      word_count: metadata.wordCount ? parseInt(metadata.wordCount) : blog.word_count,
+      internal_links_used: metadata.internalLinksUsed || blog.internal_links_used,
+      client_blog_feedback: null,
+      client_blog_approved: false,
+      client_feedback_at: null
+    }).eq('id', req.params.blogId).select().single();
+
+    if (updateErr) return res.status(500).json({ error: updateErr.message });
+    res.json({ blog: updated, versionSaved: nextVersion, mode });
+  } catch (err) {
+    console.error('Blog revision error:', err);
+    res.status(500).json({ error: 'Failed to revise blog' });
+  }
+});
+
+// ─── BLOG VERSION HISTORY ────────────────────────────────────────────────────
+
+app.get('/api/blogs/:blogId/versions', async (req, res) => {
+  const { data, error } = await supabase.from('blog_versions')
+    .select('id, version_number, revision_reason, word_count, created_at')
+    .eq('blog_id', req.params.blogId)
+    .order('version_number', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.get('/api/blog-versions/:versionId', async (req, res) => {
+  const { data, error } = await supabase.from('blog_versions')
+    .select('*')
+    .eq('id', req.params.versionId)
+    .single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+// Restore a previous version (saves current as new version first)
+app.post('/api/blogs/:blogId/restore-version/:versionId', async (req, res) => {
+  const [blogResult, versionResult] = await Promise.all([
+    supabase.from('blogs').select('*').eq('id', req.params.blogId).single(),
+    supabase.from('blog_versions').select('*').eq('id', req.params.versionId).single()
+  ]);
+  if (!blogResult.data || !versionResult.data) return res.status(404).json({ error: 'Not found' });
+  const blog = blogResult.data, version = versionResult.data;
+
+  // Save current state as a new version before restoring
+  const { data: lastVer } = await supabase.from('blog_versions').select('version_number').eq('blog_id', blog.id).order('version_number', { ascending: false }).limit(1);
+  const nextVer = (lastVer?.length > 0) ? lastVer[0].version_number + 1 : 1;
+  await supabase.from('blog_versions').insert({
+    blog_id: blog.id, version_number: nextVer,
+    content: blog.content, title_tag: blog.title_tag, meta_description: blog.meta_description,
+    slug: blog.slug, faq_json: blog.faq_json, schema_json: blog.schema_json,
+    word_count: blog.word_count, revision_reason: `Auto-saved before restoring v${version.version_number}`
+  });
+
+  // Restore version
+  const { data: updated, error } = await supabase.from('blogs').update({
+    content: version.content, title_tag: version.title_tag, meta_description: version.meta_description,
+    slug: version.slug, faq_json: version.faq_json, schema_json: version.schema_json, word_count: version.word_count
+  }).eq('id', req.params.blogId).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ blog: updated, restoredFrom: version.version_number });
 });
 
 // ─── DOCX EXPORT ─────────────────────────────────────────────────────────────

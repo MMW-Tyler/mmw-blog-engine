@@ -372,4 +372,90 @@ Respond ONLY with valid JSON, no preamble, no markdown fences:
 Do not include any text outside the JSON object.`;
 }
 
-module.exports = { buildBlogPrompt, buildTitlePrompt, buildTitleRewritePrompt, buildClusterPrompt };
+/**
+ * Builds a prompt for targeted blog revision based on client feedback.
+ * The model receives the full existing blog and is instructed to make ONLY the specific changes requested.
+ */
+function buildBlogRevisionPrompt({ existingContent, existingFaqJson, existingTitleTag, existingMetaDescription, existingSlug, clientFeedback, additionalInstructions, brandRules, mode }) {
+  const rulesBlock = brandRules && brandRules.length > 0
+    ? brandRules.map((r, i) => `${i + 1}. ${r}`).join('\n')
+    : '';
+
+  const faqBlock = existingFaqJson && existingFaqJson.length > 0
+    ? existingFaqJson.map((f, i) => `Q${i+1}: ${f.question}\nA${i+1}: ${f.answer}`).join('\n')
+    : '';
+
+  if (mode === 'full') {
+    return `You are a senior content strategist revising a healthcare blog post based on client feedback.
+
+The client has reviewed the blog and wants significant changes. Rewrite the blog incorporating their feedback while maintaining SEO quality, medical compliance, and the existing target keyword strategy.
+
+CLIENT FEEDBACK:
+${clientFeedback}
+
+${additionalInstructions ? `ADDITIONAL INSTRUCTIONS FROM TEAM:\n${additionalInstructions}\n` : ''}
+
+CURRENT BLOG CONTENT:
+${existingContent}
+
+CURRENT FAQ:
+${faqBlock || 'None'}
+
+CURRENT SEO METADATA:
+Title Tag: ${existingTitleTag || ''}
+Meta Description: ${existingMetaDescription || ''}
+Slug: ${existingSlug || ''}
+
+${rulesBlock ? `BRAND RULES (follow strictly):\n${rulesBlock}\n` : ''}
+
+Rewrite the full blog addressing the client's feedback. Output in the same format as the original:
+- Markdown body content
+- ---FAQ--- / ---END FAQ--- block with Q:/A: format (5 FAQs)
+- ---SEO METADATA--- / ---END METADATA--- block
+- ---SCHEMA--- / ---END SCHEMA--- block
+
+Maintain the same heading structure (# for H1, ## for H2, ### for H3). Keep image markers in [Image: desc | Alt: text] format. Do NOT use em dashes.`;
+  }
+
+  // Targeted edit mode (default)
+  return `You are a senior content editor making targeted revisions to a healthcare blog post based on specific client feedback.
+
+CRITICAL INSTRUCTION: Make ONLY the changes the client requested. Do NOT rewrite sections that weren't mentioned. Do NOT change the overall structure, tone, or flow unless specifically asked. Preserve all existing content that the client did not comment on — word for word.
+
+CLIENT FEEDBACK:
+${clientFeedback}
+
+${additionalInstructions ? `ADDITIONAL INSTRUCTIONS FROM TEAM:\n${additionalInstructions}\n` : ''}
+
+${rulesBlock ? `BRAND RULES (follow strictly):\n${rulesBlock}\n` : ''}
+
+CURRENT BLOG CONTENT:
+${existingContent}
+
+CURRENT FAQ:
+${faqBlock || 'None'}
+
+CURRENT SEO METADATA:
+Title Tag: ${existingTitleTag || ''}
+Meta Description: ${existingMetaDescription || ''}
+Slug: ${existingSlug || ''}
+
+---
+
+Instructions:
+1. Read the client's feedback carefully and identify EXACTLY what they want changed
+2. Make those specific changes and NOTHING else
+3. If the feedback mentions an FAQ, only modify that specific FAQ — leave the other 4 untouched
+4. If the feedback mentions a paragraph or section, edit only that section
+5. If the feedback asks to add something, add it in the most natural location
+6. Preserve all unchanged content exactly as-is — same wording, same structure
+7. Output the COMPLETE blog in the same format (not just the changed parts):
+   - Full markdown body content
+   - ---FAQ--- / ---END FAQ--- block (all 5 FAQs, modified or not)
+   - ---SEO METADATA--- / ---END METADATA--- block (update only if changes affect SEO)
+   - ---SCHEMA--- / ---END SCHEMA--- block (update only if FAQ questions changed)
+
+Do NOT use em dashes. Do NOT change content the client didn't mention.`;
+}
+
+module.exports = { buildBlogPrompt, buildTitlePrompt, buildTitleRewritePrompt, buildClusterPrompt, buildBlogRevisionPrompt };
