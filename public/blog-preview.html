@@ -7,7 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Lato:wght@400;700&display=swap" rel="stylesheet" />
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    :root{--green:#28AB83;--dark:#323547;--white:#fff;--light-green:#E5F5F0;--off-white:#F7FAF9;--border:#E0E5E3;--muted:#6B7280}
+    :root{--green:#28AB83;--dark:#323547;--white:#fff;--light-green:#E5F5F0;--off-white:#F7FAF9;--border:#E0E5E3;--muted:#6B7280;--warning:#F59E0B}
     body{font-family:'Lato',sans-serif;background:var(--off-white);color:var(--dark);min-height:100vh}
     .header{background:var(--dark);padding:16px 24px;display:flex;align-items:center;justify-content:space-between}
     .header .logo{font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;color:var(--green);letter-spacing:0.1em;text-transform:uppercase}
@@ -34,6 +34,29 @@
     .faq-item:last-child{border-bottom:none}
     .faq-q{font-weight:700;font-size:14px;margin-bottom:6px}
     .faq-a{font-size:14px;color:var(--muted);line-height:1.6}
+    /* FEEDBACK SECTION */
+    .feedback-section{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:24px 28px;margin-bottom:24px}
+    .feedback-section h2{font-family:'Poppins',sans-serif;font-size:17px;font-weight:600;margin-bottom:6px}
+    .feedback-section p{font-size:14px;color:var(--muted);margin-bottom:20px;line-height:1.6}
+    .feedback-actions{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+    .btn{padding:10px 22px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:'Lato',sans-serif;display:inline-flex;align-items:center;gap:8px}
+    .btn-approve{background:var(--green);color:var(--white)}.btn-approve:hover{background:#22977A}
+    .btn-feedback{background:var(--white);color:var(--dark);border:2px solid var(--border)}.btn-feedback:hover{border-color:var(--warning);color:#92400E}
+    .btn-undo{background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;text-decoration:underline}
+    .btn:disabled{opacity:0.6;cursor:not-allowed}
+    .feedback-form{display:none;margin-top:4px}
+    .feedback-form textarea{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-family:'Lato',sans-serif;font-size:14px;resize:vertical;min-height:100px;line-height:1.5}
+    .feedback-form textarea:focus{outline:none;border-color:var(--warning)}
+    .feedback-form-actions{display:flex;gap:10px;margin-top:10px}
+    .btn-submit{background:var(--warning);color:var(--white);padding:9px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none}
+    .btn-cancel{background:none;border:none;font-size:13px;color:var(--muted);cursor:pointer;padding:9px}
+    .response-saved{border-radius:10px;padding:16px 18px;margin-top:4px}
+    .response-saved.approved{background:var(--light-green);border:1px solid var(--green)}
+    .response-saved.feedback-given{background:#FFFBEB;border:1px solid #FDE68A}
+    .response-label{font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;margin-bottom:5px}
+    .response-label.approved{color:var(--green)}
+    .response-label.feedback-given{color:#92400E}
+    .response-text{font-size:13px;color:var(--dark);line-height:1.5}
     .footer-note{text-align:center;font-size:13px;color:var(--muted);line-height:1.7;padding:20px}
     .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 14px}
     @keyframes spin{to{transform:rotate(360deg)}}
@@ -54,19 +77,24 @@
   </div>
 <script>
   const token = window.location.pathname.split('/blog-preview/')[1];
+  let blog = null;
+  let currentResponse = null; // { action: 'approved'|'feedback', feedback: '' }
 
   async function init() {
     if (!token) { showError('Invalid preview link.'); return; }
     try {
       const res = await fetch('/api/blog-preview/' + token);
       if (!res.ok) throw new Error();
-      const blog = await res.json();
+      blog = await res.json();
       if (blog.error) throw new Error(blog.error);
-      render(blog);
+      // Pre-populate existing response
+      if (blog.client_blog_approved) currentResponse = { action: 'approved' };
+      else if (blog.client_blog_feedback) currentResponse = { action: 'feedback', feedback: blog.client_blog_feedback };
+      render();
     } catch { showError('This preview link is invalid or has expired. Please reach out to your MMW contact for an updated link.'); }
   }
 
-  function render(blog) {
+  function render() {
     let html = '';
 
     // Meta header
@@ -90,9 +118,81 @@
       </div>`;
     }
 
-    html += `<div class="footer-note">This is a draft preview prepared by Medical Marketing Whiz. Please review the content and share any feedback with your MMW contact.</div>`;
+    // Feedback section
+    html += `<div class="feedback-section">
+      <h2>Your Feedback</h2>
+      <p>Please let us know if this content looks good or if you'd like any changes. Your response goes directly to our team — no need to send an email.</p>
+      ${renderFeedbackUI()}
+    </div>`;
+
+    html += `<div class="footer-note">This is a draft preview prepared by Medical Marketing Whiz. Your responses are saved automatically.</div>`;
     document.getElementById('app').innerHTML = html;
     document.title = `Preview: ${blog.title_tag || blog.title}`;
+  }
+
+  function renderFeedbackUI() {
+    if (!currentResponse) {
+      return `<div class="feedback-actions">
+        <button class="btn btn-approve" onclick="submitApproval()">✓ Looks great — approve it</button>
+        <button class="btn btn-feedback" onclick="showFeedbackForm()">💬 I have some feedback</button>
+      </div>
+      <div id="feedbackForm" class="feedback-form">
+        <textarea id="feedbackText" placeholder="Let us know what you'd like changed or adjusted. Be as specific as you'd like — our team will review your notes and update accordingly."></textarea>
+        <div class="feedback-form-actions">
+          <button class="btn-submit" onclick="submitFeedback()">Submit Feedback</button>
+          <button class="btn-cancel" onclick="hideFeedbackForm()">Cancel</button>
+        </div>
+      </div>`;
+    }
+
+    if (currentResponse.action === 'approved') {
+      return `<div class="response-saved approved">
+        <div class="response-label approved">✓ You approved this blog</div>
+        <div class="response-text" style="color:var(--muted);font-size:12px;margin-top:3px;">Our team has been notified. If you'd like to change your response, click below.</div>
+      </div>
+      <button class="btn-undo" onclick="undoResponse()" style="margin-top:10px;">Change my response</button>`;
+    }
+
+    return `<div class="response-saved feedback-given">
+      <div class="response-label feedback-given">💬 Your feedback has been submitted</div>
+      <div class="response-text">${esc(currentResponse.feedback)}</div>
+    </div>
+    <button class="btn-undo" onclick="undoResponse()" style="margin-top:10px;">Edit my feedback</button>`;
+  }
+
+  function showFeedbackForm() {
+    document.getElementById('feedbackForm').style.display = 'block';
+    document.getElementById('feedbackText').focus();
+  }
+
+  function hideFeedbackForm() {
+    document.getElementById('feedbackForm').style.display = 'none';
+  }
+
+  async function submitApproval() {
+    try {
+      await fetch(`/api/blog-preview/${token}/respond`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'approved' }) });
+      currentResponse = { action: 'approved' };
+      render();
+    } catch { alert('Something went wrong — please try again.'); }
+  }
+
+  async function submitFeedback() {
+    const feedback = document.getElementById('feedbackText').value.trim();
+    if (!feedback) { alert('Please enter your feedback before submitting.'); return; }
+    try {
+      await fetch(`/api/blog-preview/${token}/respond`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'feedback', feedback }) });
+      currentResponse = { action: 'feedback', feedback };
+      render();
+    } catch { alert('Something went wrong — please try again.'); }
+  }
+
+  async function undoResponse() {
+    try {
+      await fetch(`/api/blog-preview/${token}/respond`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'undo' }) });
+      currentResponse = null;
+      render();
+    } catch { alert('Something went wrong — please try again.'); }
   }
 
   function renderBody(markdown) {
@@ -107,7 +207,6 @@
       else if (t.startsWith('### ')) html += `<h3>${esc(t.slice(4))}</h3>`;
       else if (isBullet) { if (!inUl) { html += '<ul>'; inUl = true; } html += `<li>${esc(t.slice(2))}</li>`; }
       else if (t.startsWith('[Image:')) {
-        // Parse [Image: desc | Alt: alt text]
         const inner = t.slice(7, -1);
         const parts = inner.split('|');
         const desc = parts[0]?.trim() || '';
