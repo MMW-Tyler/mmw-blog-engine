@@ -118,7 +118,7 @@ Title Tag: [60 characters or fewer]
 Meta Description: [150-160 characters, written for click-through]
 Slug: [lowercase-hyphenated, keyword-forward]
 Target Keyword: [primary keyword this post targets]
-Word Count: [estimated word count of body content only]
+Word Count: [integer only, no commas or units, estimated word count of body content only]
 Internal Links Used: [anchor text + URL for any internal links, or "None"]
 ---END METADATA---
 

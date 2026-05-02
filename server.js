@@ -262,6 +262,31 @@ app.get('/api/clients/:id/titles', async (req, res) => {
   res.json(data);
 });
 
+app.get('/api/clients/:id/titles/export-csv', async (req, res) => {
+  const { data: client } = await supabase.from('clients').select('name').eq('id', req.params.id).single();
+  const { data, error } = await supabase.from('blog_titles').select('*').eq('client_id', req.params.id).neq('status','rejected').order('scheduled_date', { ascending: true });
+  if (error) return res.status(500).json({ error: error.message });
+
+  const escape = v => v == null ? '' : `"${String(v).replace(/"/g, '""')}"`;
+  const rows = [
+    ['Scheduled Date', 'Schedule Slot', 'Title', 'Target Keyword', 'Status', 'Client Approved', 'Rationale'],
+    ...(data || []).map(t => [
+      t.scheduled_date || '',
+      t.schedule_slot || '',
+      t.title || '',
+      t.target_keyword || '',
+      t.status || '',
+      t.client_approved ? 'Yes' : 'No',
+      t.rationale || ''
+    ])
+  ];
+  const csv = rows.map(r => r.map(escape).join(',')).join('\r\n');
+  const clientName = (client?.name || 'client').replace(/[^a-z0-9]/gi, '-').toLowerCase();
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="${clientName}-content-calendar.csv"`);
+  res.send(csv);
+});
+
 app.put('/api/titles/:titleId', async (req, res) => {
   const { title, target_keyword, status, notes, scheduled_date, schedule_slot } = req.body;
   const updates = { title, target_keyword, status, notes };
@@ -408,7 +433,7 @@ app.post('/api/generate-blog', async (req, res) => {
       metadata.metaDescription = (mt.match(/Meta Description:\s*(.+)/) || [])[1]?.trim();
       metadata.slug = (mt.match(/Slug:\s*(.+)/) || [])[1]?.trim();
       metadata.targetKeyword = (mt.match(/Target Keyword:\s*(.+)/) || [])[1]?.trim();
-      metadata.wordCount = (mt.match(/Word Count:\s*(\d+)/) || [])[1]?.trim();
+      metadata.wordCount = (mt.match(/Word Count:\s*([\d,]+)/) || [])[1]?.replace(/,/g, '').trim();
       metadata.internalLinksUsed = (mt.match(/Internal Links Used:\s*([\s\S]+)/) || [])[1]?.trim();
     }
 
@@ -801,7 +826,7 @@ app.post('/api/clients/:id/batch-generate', async (req, res) => {
           metadata.metaDescription = (mt.match(/Meta Description:\s*(.+)/) || [])[1]?.trim();
           metadata.slug = (mt.match(/Slug:\s*(.+)/) || [])[1]?.trim();
           metadata.targetKeyword = (mt.match(/Target Keyword:\s*(.+)/) || [])[1]?.trim();
-          metadata.wordCount = (mt.match(/Word Count:\s*(\d+)/) || [])[1]?.trim();
+          metadata.wordCount = (mt.match(/Word Count:\s*([\d,]+)/) || [])[1]?.replace(/,/g, '').trim();
           metadata.internalLinksUsed = (mt.match(/Internal Links Used:\s*([\s\S]+)/) || [])[1]?.trim();
         }
 
@@ -875,6 +900,12 @@ app.put('/api/blogs/:blogId/status', async (req, res) => {
   res.json(data);
 });
 
+app.delete('/api/blogs/:blogId', async (req, res) => {
+  const { error } = await supabase.from('blogs').delete().eq('id', req.params.blogId);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
 // ─── BLOG REVISION ───────────────────────────────────────────────────────────
 
 // Helper to parse Claude's output into structured blog parts
@@ -904,7 +935,7 @@ function parseBlogOutput(rawContent) {
     metadata.metaDescription = (mt.match(/Meta Description:\s*(.+)/) || [])[1]?.trim();
     metadata.slug = (mt.match(/Slug:\s*(.+)/) || [])[1]?.trim();
     metadata.targetKeyword = (mt.match(/Target Keyword:\s*(.+)/) || [])[1]?.trim();
-    metadata.wordCount = (mt.match(/Word Count:\s*(\d+)/) || [])[1]?.trim();
+    metadata.wordCount = (mt.match(/Word Count:\s*([\d,]+)/) || [])[1]?.replace(/,/g, '').trim();
     metadata.internalLinksUsed = (mt.match(/Internal Links Used:\s*([\s\S]+)/) || [])[1]?.trim();
   }
 

@@ -129,7 +129,9 @@
     .rules-list{display:flex;flex-direction:column;gap:8px}
     .rule-item{display:flex;align-items:flex-start;justify-content:space-between;background:var(--off-white);border:1px solid var(--border);border-radius:8px;padding:10px 14px;gap:12px}
     .rule-text{font-size:13px;flex:1;line-height:1.5}
-    .title-card{border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;background:var(--white);display:flex;align-items:flex-start;gap:14px}
+    .title-card{border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;background:var(--white);display:flex;align-items:flex-start;gap:14px;cursor:grab}
+    .title-card.drag-over{border:2px dashed var(--green);background:var(--light-green);transform:scale(1.01)}
+    .title-card.dragging{opacity:0.45;cursor:grabbing}
     .title-actions{display:flex;gap:6px;flex-shrink:0;align-items:flex-start;margin-top:2px;flex-wrap:wrap}
     .generation-progress{background:var(--light-green);border:1px solid var(--green);border-radius:10px;padding:24px;text-align:center}
     .generation-progress p{font-size:14px;color:var(--green);margin-top:10px}
@@ -581,13 +583,14 @@ function renderTitlesTabFiltered() {
       <button class="btn btn-primary" onclick="generateTitles()" id="generateTitlesBtn">🎯 Generate Titles</button>
     </div>
 
-    ${totalTitles > 5 ? `
-    <div style="margin-bottom:16px;display:flex;gap:8px;align-items:center;">
-      <div style="flex:1;position:relative;">
-        <input id="titleSearchInput" class="form-input" value="${escapeHtml(state.titleSearchQuery||'')}" placeholder="🔎 Search titles, keywords, or schedule (e.g. 'hormone', 'April 2025')..." oninput="onTitleSearchInput(this.value)" style="padding-left:14px;" />
-      </div>
+    ${totalTitles > 0 ? `
+    <div style="margin-bottom:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      ${totalTitles > 5 ? `<div style="flex:1;position:relative;min-width:200px;">
+        <input id="titleSearchInput" class="form-input" value="${escapeHtml(state.titleSearchQuery||'')}" placeholder="🔎 Search titles, keywords, or schedule..." oninput="onTitleSearchInput(this.value)" style="padding-left:14px;" />
+      </div>` : '<div style="flex:1;"></div>'}
       ${hasSearchQuery ? `<button class="btn btn-secondary btn-sm" onclick="clearTitleSearch()">Clear</button>` : ''}
       ${hasSearchQuery ? `<span style="font-size:12px;color:var(--muted);white-space:nowrap;">${filteredTotal} of ${totalTitles}</span>` : ''}
+      <a href="${API}/api/clients/${state.activeClient.id}/titles/export-csv" download class="btn btn-secondary btn-sm" title="Download all titles as a content calendar spreadsheet">📅 Export Calendar</a>
     </div>` : ''}
     ${proposed.length?`
     <div class="card">
@@ -655,9 +658,12 @@ function renderTitleCard(t) {
   const clusterBadge=t.cluster_id?`<span title="${clusterPillar ? 'Cluster: '+escapeHtml(clusterPillar) : 'Topic cluster'}" style="display:inline-flex;align-items:center;gap:4px;background:#EFF6FF;color:var(--blue);font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;cursor:help;">🔗 ${clusterPillar ? escapeHtml(clusterPillar.length > 30 ? clusterPillar.slice(0, 30) + '…' : clusterPillar) : 'Cluster'} ${t.cluster_position?`· ${t.cluster_position}`:''}</span>`:'';
   const suggestionBlock=t.client_suggestion?`<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;padding:8px 12px;margin-top:8px;font-size:12px;line-height:1.5;"><strong style="color:#92400E;">Client note:</strong> ${escapeHtml(t.client_suggestion)}</div>`:'';
   const rewriteBtn=t.needs_review&&t.client_suggestion?`<button class="btn btn-warning btn-sm" onclick="openRewriteModal('${t.id}',\`${escapeJs(t.title)}\`,\`${escapeJs(t.client_suggestion)}\`)">✨ AI Rewrite</button>`:'';
-  return `<div class="title-card" id="titleCard_${t.id}">
+  return `<div class="title-card" id="titleCard_${t.id}" draggable="true" ondragstart="titleDragStart(event,'${t.id}')" ondragover="titleDragOver(event,'${t.id}')" ondrop="titleDragDrop(event,'${t.id}')" ondragend="titleDragEnd(event)">
     <div style="flex:1;">
-      ${t.schedule_slot?`<div style="font-size:11px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">${escapeHtml(t.schedule_slot)}</div>`:''}
+      ${t.scheduled_date?`<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">
+        <span style="font-size:11px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:0.06em;">${escapeHtml(t.schedule_slot||'Scheduled')}</span>
+        <input type="date" value="${t.scheduled_date}" onchange="updateTitleDate('${t.id}',this.value,'${escapeJs(t.schedule_slot||'')}')" style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:2px 5px;color:var(--text);background:var(--white);cursor:pointer;font-family:var(--font-ui);" title="Edit publish date" />
+      </div>`:''}
       <div data-field="title" style="font-size:14px;font-weight:500;line-height:1.4;">${escapeHtml(t.title)}</div>
       ${t.target_keyword?`<div data-field="keyword" style="font-size:12px;color:var(--muted);margin-top:3px;">🔑 ${escapeHtml(t.target_keyword)}</div>`:''}
       ${t.rationale?`<div style="font-size:12px;color:var(--muted);margin-top:4px;font-style:italic;line-height:1.4;">${escapeHtml(t.rationale)}</div>`:''}
@@ -666,10 +672,11 @@ function renderTitleCard(t) {
     </div>
     <div class="title-actions">
       <span class="badge badge-${t.status}">${formatStatus(t.status)}</span>
-      ${t.status==='proposed'?`<button class="btn btn-secondary btn-sm" onclick="updateTitleStatus('${t.id}','approved')" title="Approve this title">✓ Approve</button><button class="btn btn-secondary btn-sm" onclick="editTitle('${t.id}')" title="Edit title">✏️</button><button class="btn btn-danger btn-sm" onclick="updateTitleStatus('${t.id}','rejected')" title="Reject title">✕</button>`:''}
+      ${t.status==='proposed'?`<button class="btn btn-secondary btn-sm" onclick="updateTitleStatus('${t.id}','approved')" title="Approve this title">✓ Approve</button><button class="btn btn-secondary btn-sm" onclick="editTitle('${t.id}')" title="Edit title">✏️</button><button class="btn btn-danger btn-sm" onclick="updateTitleStatus('${t.id}','rejected')" title="Reject title">✕</button><button class="btn btn-danger btn-sm" onclick="deleteTitle('${t.id}')" title="Delete title permanently">🗑</button>`:''}
       ${rewriteBtn}
-      ${t.status==='approved'?`<button class="btn btn-primary btn-sm" onclick="openGenerateModal('${t.id}',\`${escapeJs(t.title)}\`,\`${escapeJs(t.target_keyword||'')}\`)">✍️ Write</button>`:''}
-      ${t.status==='rejected'?`<button class="btn btn-secondary btn-sm" onclick="updateTitleStatus('${t.id}','proposed')">↩ Restore</button>`:''}
+      ${t.status==='approved'?`<button class="btn btn-primary btn-sm" onclick="openGenerateModal('${t.id}',\`${escapeJs(t.title)}\`,\`${escapeJs(t.target_keyword||'')}\`)">✍️ Write</button><button class="btn btn-secondary btn-sm" onclick="updateTitleStatus('${t.id}','proposed')" title="Move back to Proposed">↩ Un-approve</button><button class="btn btn-danger btn-sm" onclick="deleteTitle('${t.id}')" title="Delete title permanently">🗑</button>`:''}
+      ${t.status==='rejected'?`<button class="btn btn-secondary btn-sm" onclick="updateTitleStatus('${t.id}','proposed')">↩ Restore</button><button class="btn btn-danger btn-sm" onclick="deleteTitle('${t.id}')" title="Delete title permanently">🗑</button>`:''}
+      ${t.status==='in_progress'?`<button class="btn btn-secondary btn-sm" onclick="updateTitleStatus('${t.id}','approved')" title="Move back to Approved — any generated blog will remain in Blog Queue">↩ Un-approve</button><button class="btn btn-danger btn-sm" onclick="deleteTitle('${t.id}')" title="Delete title permanently">🗑</button>`:''}
     </div>
   </div>`;
 }
@@ -699,6 +706,68 @@ async function shareWithClient(btn) {
 
 async function updateTitleStatus(titleId,status) {
   await fetch(`${API}/api/titles/${titleId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
+  renderTitlesTab();
+}
+
+async function deleteTitle(titleId) {
+  if (!confirm('Permanently delete this title? This cannot be undone.')) return;
+  const res = await fetch(`${API}/api/titles/${titleId}`,{method:'DELETE'});
+  if (!res.ok) { showToast('Failed to delete title','error'); return; }
+  showToast('Title deleted','success');
+  renderTitlesTab();
+}
+
+let _dragTitleId = null;
+
+function titleDragStart(e, titleId) {
+  if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.tagName === 'A') { e.preventDefault(); return; }
+  _dragTitleId = titleId;
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.classList.add('dragging');
+}
+
+function titleDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.title-card').forEach(c => c.classList.remove('drag-over'));
+  _dragTitleId = null;
+}
+
+function titleDragOver(e, titleId) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  if (titleId !== _dragTitleId) {
+    document.querySelectorAll('.title-card').forEach(c => c.classList.remove('drag-over'));
+    e.currentTarget.classList.add('drag-over');
+  }
+}
+
+async function titleDragDrop(e, targetId) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const sourceId = _dragTitleId;
+  if (!sourceId || sourceId === targetId) return;
+  const titles = state.allTitlesForClient || [];
+  const src = titles.find(t => t.id === sourceId);
+  const tgt = titles.find(t => t.id === targetId);
+  if (!src || !tgt || (!src.scheduled_date && !tgt.scheduled_date)) return;
+  await Promise.all([
+    fetch(`${API}/api/titles/${src.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({scheduled_date:tgt.scheduled_date,schedule_slot:tgt.schedule_slot})}),
+    fetch(`${API}/api/titles/${tgt.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({scheduled_date:src.scheduled_date,schedule_slot:src.schedule_slot})})
+  ]);
+  showToast('Publish dates swapped','success');
+  renderTitlesTab();
+}
+
+async function updateTitleDate(titleId, newDate, existingSlot) {
+  if (!newDate) return;
+  // Rebuild slot label: keep "— Blog N" suffix from existing slot, update the month/year
+  const suffix = existingSlot ? existingSlot.replace(/^[^—]+/, '').trim() : '';
+  const d = new Date(newDate + 'T12:00:00');
+  const monthYear = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  const newSlot = suffix ? `${monthYear} ${suffix}` : monthYear;
+  const res = await fetch(`${API}/api/titles/${titleId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({scheduled_date:newDate,schedule_slot:newSlot})});
+  if (!res.ok) { showToast('Failed to update date','error'); return; }
+  showToast('Publish date updated','success');
   renderTitlesTab();
 }
 
@@ -798,46 +867,67 @@ async function runGenerate(titleId) {
 }
 
 // ── BLOGS TAB ──────────────────────────────────────────────────────
+function renderBlogRow(b, status) {
+  const hasFeedback = b.client_blog_feedback && !b.client_blog_approved;
+  const rowStyle = hasFeedback ? 'background:#FFFDF5;' : '';
+  return `<tr style="${rowStyle}">
+    <td style="font-weight:500;max-width:200px;" title="${escapeHtml(b.title)}">
+      <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(b.title)}</div>
+      ${b.client_blog_approved?`<span style="font-size:10px;background:var(--light-green);color:var(--green);padding:1px 6px;border-radius:10px;font-weight:600;">✓ Client OK</span>`:''}
+      ${hasFeedback?`<div style="font-size:11px;margin-top:4px;padding:5px 8px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:5px;color:#92400E;line-height:1.4;white-space:normal;max-width:240px;">💬 ${escapeHtml(b.client_blog_feedback.length > 80 ? b.client_blog_feedback.slice(0,80)+'…' : b.client_blog_feedback)}</div>`:''}
+    </td>
+    <td style="font-size:12px;color:var(--muted);">${b.target_keyword||'–'}</td>
+    <td style="font-size:12px;color:var(--muted);">${b.word_count?b.word_count.toLocaleString():'–'}</td>
+    <td><span style="font-size:11px;color:${b.is_one_off?'var(--muted)':'var(--green)'};">${b.is_one_off?'One-Off':(b.cluster_id?'🔗 Cluster':'From Queue')}</span></td>
+    <td style="font-size:12px;color:var(--muted);">${formatDate(b.created_at)}</td>
+    <td><div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <button class="btn btn-secondary btn-sm" onclick="viewBlog('${b.id}')" title="View blog">View</button>
+      <button class="btn btn-secondary btn-sm" onclick="exportBlog('${b.id}')" title="Download as .docx">⬇️</button>
+      ${hasFeedback?`<button class="btn btn-warning btn-sm" onclick="openReviseModal('${b.id}')" title="Revise blog based on client feedback">✏️ Revise</button>`:''}
+      ${status==='draft'?`<button class="btn btn-secondary btn-sm" onclick="moveBlogStatus('${b.id}','in-review',this)" title="Move to review">→ Review</button>`:''}
+      ${status==='in-review'?`<button class="btn btn-primary btn-sm" onclick="moveBlogStatus('${b.id}','approved',this)" title="Mark as approved">✓ Approve</button><button class="btn btn-secondary btn-sm" onclick="moveBlogStatus('${b.id}','draft',this)" title="Move back to Draft">↩ Un-approve</button>`:''}
+      ${status==='approved'?`<button class="btn btn-primary btn-sm" onclick="openWpPushModal('${b.id}')" title="Push to WordPress as draft or scheduled">🚀 Push to WP</button><button class="btn btn-secondary btn-sm" onclick="moveBlogStatus('${b.id}','in-review',this)" title="Move back to In Review">↩ Un-approve</button>`:''}
+      ${status==='published'?`<button class="btn btn-secondary btn-sm" onclick="publishWpPost('${b.id}',this)" title="Publish live on WordPress">🌐 Publish Live</button>${b.wp_post_id&&state.activeClient?.wp_url?`<a href="${state.activeClient.wp_url}/wp-admin/post.php?post=${b.wp_post_id}&action=edit" target="_blank" class="btn btn-secondary btn-sm" title="Open in WordPress admin">WP ↗</a>`:''}`:''}
+      ${status!=='published'?`<button class="btn btn-secondary btn-sm" onclick="shareBlog('${b.id}', this)" title="Copy client preview link">🔗</button>`:''}
+      ${status!=='published'?`<button class="btn btn-danger btn-sm" onclick="deleteBlog('${b.id}')" title="Delete blog permanently">🗑</button>`:''}
+    </div></td>
+  </tr>`;
+}
+
 async function renderBlogsTab() {
   if (state.clientTab!=='blogs') return;
   const el=document.getElementById('clientTabContent');
   el.innerHTML=`<div style="text-align:center;padding:40px;"><div class="spinner spinner-dark" style="margin:0 auto;width:28px;height:28px;border-width:3px;"></div></div>`;
   const blogs=await fetch(`${API}/api/clients/${state.activeClient.id}/blogs`).then(r=>r.json());
   if (blogs.error) { el.innerHTML=`<div class="alert alert-error">❌ ${blogs.error}</div>`; return; }
-  const groups={draft:blogs.filter(b=>b.status==='draft'),'in-review':blogs.filter(b=>b.status==='in-review'),approved:blogs.filter(b=>b.status==='approved'),published:blogs.filter(b=>b.status==='published')};
-  const sIcon={draft:'📝','in-review':'👀',approved:'✅',published:'🚀'};
-  el.innerHTML=!blogs.length?`<div class="card"><div class="empty-state"><div class="icon">📄</div><div class="title">No blogs yet</div><div class="desc">Approve titles then click Write to generate blogs.</div></div></div>`
-    :Object.entries(groups).filter(([,b])=>b.length).map(([status,items])=>`
+  const groups={draft:blogs.filter(b=>b.status==='draft'),'in-review':blogs.filter(b=>b.status==='in-review'),approved:blogs.filter(b=>b.status==='approved')};
+  const published=blogs.filter(b=>b.status==='published');
+  const sIcon={draft:'📝','in-review':'👀',approved:'✅'};
+  const blogTable=(items,status)=>`<div class="table-wrap"><table><thead><tr><th>Title</th><th>Keyword</th><th>Words</th><th>Type</th><th>Created</th><th>Actions</th></tr></thead><tbody>${items.map(b=>renderBlogRow(b,status)).join('')}</tbody></table></div>`;
+
+  const inProgressSections = Object.entries(groups).filter(([,b])=>b.length).map(([status,items])=>`
     <div class="card">
       <div class="card-title">${sIcon[status]} ${formatStatus(status)} <span style="font-size:12px;color:var(--muted);font-weight:400;">${items.length} blog${items.length!==1?'s':''}</span></div>
-      <div class="table-wrap"><table><thead><tr><th>Title</th><th>Keyword</th><th>Words</th><th>Type</th><th>Created</th><th>Actions</th></tr></thead><tbody>
-        ${items.map(b=>{
-          const hasFeedback = b.client_blog_feedback && !b.client_blog_approved;
-          const rowStyle = hasFeedback ? 'background:#FFFDF5;' : '';
-          return `<tr style="${rowStyle}">
-          <td style="font-weight:500;max-width:200px;" title="${escapeHtml(b.title)}">
-            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(b.title)}</div>
-            ${b.client_blog_approved?`<span style="font-size:10px;background:var(--light-green);color:var(--green);padding:1px 6px;border-radius:10px;font-weight:600;">✓ Client OK</span>`:''}
-            ${hasFeedback?`<div style="font-size:11px;margin-top:4px;padding:5px 8px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:5px;color:#92400E;line-height:1.4;white-space:normal;max-width:240px;">💬 ${escapeHtml(b.client_blog_feedback.length > 80 ? b.client_blog_feedback.slice(0,80)+'…' : b.client_blog_feedback)}</div>`:''}
-          </td>
-          <td style="font-size:12px;color:var(--muted);">${b.target_keyword||'–'}</td>
-          <td style="font-size:12px;color:var(--muted);">${b.word_count?b.word_count.toLocaleString():'–'}</td>
-          <td><span style="font-size:11px;color:${b.is_one_off?'var(--muted)':'var(--green)'};">${b.is_one_off?'One-Off':(b.cluster_id?'🔗 Cluster':'From Queue')}</span></td>
-          <td style="font-size:12px;color:var(--muted);">${formatDate(b.created_at)}</td>
-          <td><div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button class="btn btn-secondary btn-sm" onclick="viewBlog('${b.id}')" title="View blog">View</button>
-            <button class="btn btn-secondary btn-sm" onclick="exportBlog('${b.id}')" title="Download as .docx">⬇️</button>
-            ${hasFeedback?`<button class="btn btn-warning btn-sm" onclick="openReviseModal('${b.id}')" title="Revise blog based on client feedback">✏️ Revise</button>`:''}
-            ${status==='draft'?`<button class="btn btn-secondary btn-sm" onclick="moveBlogStatus('${b.id}','in-review',this)" title="Move to review">→ Review</button>`:''}
-            ${status==='in-review'?`<button class="btn btn-primary btn-sm" onclick="moveBlogStatus('${b.id}','approved',this)" title="Mark as approved">✓ Approve</button>`:''}
-            ${status==='approved'?`<button class="btn btn-primary btn-sm" onclick="openWpPushModal('${b.id}')" title="Push to WordPress as draft or scheduled">🚀 Push to WP</button>`:''}
-            ${status==='published'?`<button class="btn btn-secondary btn-sm" onclick="publishWpPost('${b.id}',this)" title="Publish live on WordPress">🌐 Publish Live</button>${b.wp_post_id&&state.activeClient?.wp_url?`<a href="${state.activeClient.wp_url}/wp-admin/post.php?post=${b.wp_post_id}&action=edit" target="_blank" class="btn btn-secondary btn-sm" title="Open in WordPress admin">WP ↗</a>`:''}`:''}
-            <button class="btn btn-secondary btn-sm" onclick="shareBlog('${b.id}', this)" title="Copy client preview link">🔗</button>
-          </div></td>
-        </tr>`;}
-        ).join('')}
-      </tbody></table></div>
+      ${blogTable(items,status)}
     </div>`).join('');
+
+  const publishedSection = `
+    <div class="card">
+      <div class="card-title">🚀 Published <span style="font-size:12px;color:var(--muted);font-weight:400;">${published.length} blog${published.length!==1?'s':''} sent to WordPress</span></div>
+      ${published.length ? blogTable(published,'published') : `<div style="padding:20px 0;text-align:center;color:var(--muted);font-size:13px;">No blogs published through this tool yet. Once you push a blog to WordPress it will appear here.</div>`}
+    </div>`;
+
+  el.innerHTML = !blogs.length
+    ? `<div class="card"><div class="empty-state"><div class="icon">📄</div><div class="title">No blogs yet</div><div class="desc">Approve titles then click Write to generate blogs.</div></div></div>${publishedSection}`
+    : inProgressSections + publishedSection;
+}
+
+async function deleteBlog(blogId) {
+  if (!confirm('Permanently delete this blog? This cannot be undone.')) return;
+  const res = await fetch(`${API}/api/blogs/${blogId}`,{method:'DELETE'});
+  if (!res.ok) { showToast('Failed to delete blog','error'); return; }
+  showToast('Blog deleted','success');
+  renderBlogsTab();
 }
 
 async function viewBlog(blogId) { const blog=await fetch(`${API}/api/blogs/${blogId}`).then(r=>r.json()); openBlogView(blog); }
